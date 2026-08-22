@@ -50,7 +50,7 @@ private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDi
 
 private const val FAST_EVENT_DELIVERY_TIMEOUT = 0L
 private const val IDLE_EVENT_DELIVERY_TIMEOUT = 250L
-private const val SPLASH_ACTIVE_WINDOW = 10_000L
+private const val SPLASH_ACTIVE_WINDOW = 5_000L
 
 private val latestServiceMode = atomic(0)
 private val latestServiceTime = atomic(0L)
