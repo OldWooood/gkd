@@ -12,13 +12,12 @@ import li.songe.gkd.data.CategoryConfig
 import li.songe.gkd.data.GlobalRule
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.ResolvedAppGroup
+import li.songe.gkd.data.SPLASH_GROUP_NAME_PREFIX
 import li.songe.gkd.data.ResolvedGlobalGroup
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.data.SubsItem
 import li.songe.gkd.db.DbSet
 import java.net.URI
-
-private const val SPLASH_GROUP_NAME_PREFIX = "开屏广告"
 
 val subsItemsFlow by lazy {
     DbSet.subsItemDao.query().stateIn(appScope, SharingStarted.Eagerly, emptyList())

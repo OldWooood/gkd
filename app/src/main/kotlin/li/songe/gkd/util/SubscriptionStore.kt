@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import li.songe.gkd.data.RawSubscription
+import li.songe.gkd.data.SPLASH_GROUP_NAME_PREFIX
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.data.SubsItem
 import li.songe.gkd.data.SubsVersion
@@ -268,7 +269,7 @@ object SubscriptionStore {
                 return@withStateLock
             }
             val subscription = try {
-                RawSubscription.parse(text)
+                filterSplashGroups(RawSubscription.parse(text))
             } catch (e: Exception) {
                 e.printStackTrace()
                 LogUtils.d(e)
@@ -429,6 +430,44 @@ object SubscriptionStore {
         LogUtils.d("更新订阅文件:id=$id,name=${nextSubscription.name}")
     }
 
+    private fun filterSplashGroups(subscription: RawSubscription): RawSubscription {
+        var changed = false
+        val globalGroups = subscription.globalGroups.filter { g ->
+            val keep = g.name.startsWith(SPLASH_GROUP_NAME_PREFIX)
+            changed = changed || !keep
+            keep
+        }
+        val apps = subscription.apps.mapNotNull { app ->
+            val groups = app.groups.filter { g ->
+                val keep = g.name.startsWith(SPLASH_GROUP_NAME_PREFIX)
+                changed = changed || !keep
+                keep
+            }
+            when {
+                groups.isEmpty() -> {
+                    changed = true
+                    null
+                }
+
+                groups.size == app.groups.size -> app
+                else -> {
+                    changed = true
+                    app.copy(groups = groups)
+                }
+            }
+        }
+        if (!changed) return subscription
+        val categories = subscription.categories.filter { c ->
+            globalGroups.any { it.name.startsWith(c.name) } ||
+                    apps.any { a -> a.groups.any { g -> g.name.startsWith(c.name) } }
+        }
+        return subscription.copy(
+            globalGroups = globalGroups,
+            apps = apps,
+            categories = categories,
+        )
+    }
+
     private fun writeAtomic(file: File, bytes: ByteArray) {
         val atomicFile = AtomicFile(file)
         var output: FileOutputStream? = null
@@ -546,7 +585,7 @@ object SubscriptionStore {
             throw Exception("请求更新链接失败", e)
         }
         val subscription = try {
-            RawSubscription.parse(text)
+            filterSplashGroups(RawSubscription.parse(text))
         } catch (e: Exception) {
             throw Exception("解析文本失败", e)
         }

@@ -30,6 +30,7 @@ import net.objecthunter.exp4j.Expression
 import net.objecthunter.exp4j.ExpressionBuilder
 import java.util.Objects
 
+const val SPLASH_GROUP_NAME_PREFIX = "开屏广告"
 
 @Serializable
 data class RawSubscription(
