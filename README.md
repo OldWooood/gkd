@@ -20,11 +20,21 @@
 
 **本项目遵循 [GPL-3.0](/LICENSE) 开源，项目仅供学习交流，禁止用于商业或非法用途**
 
+## Fork 修改说明
+
+本 fork 是 [gkd-kit/gkd](https://github.com/gkd-kit/gkd) 的个人定制版，只关注一件事：**跳过开屏广告**
+
+- **仅保留开屏广告规则**：订阅解析阶段即丢弃其他类别的规则（更新提示、全屏广告、青少年模式等均不参与匹配），订阅浏览界面同步只显示开屏广告分组
+- **仅支持 Android 16+**：minSdk 26 → 36，移除全部旧版本适配分支
+- **按开屏周期自适应事件投递**：进应用后规则活跃窗口内 0ms 全速投递保证开屏响应，其余时间 250ms 低频档 + 无规则应用内容事件入口丢弃，降低待机功耗
+- **应用内更新指向本仓库**：通过 `releases/latest/download/update.json` 检查更新，与官方源完全隔离
+- **本地签名配置**：支持仓库根目录未跟踪的 `key.properties`（兼容 `storeFile/storePassword/keyAlias/keyPassword` 键名）
+
 ## 安装
 
-<a href="https://gkd.li/guide/"><img src="https://e.gkd.li/f23b704d-d781-494b-9719-393f95683b89" alt="Download from GKD.LI" width="32%" /></a><a href="https://play.google.com/store/apps/details?id=li.songe.gkd"><img src="https://e.gkd.li/f63fabeb-0342-4961-a46d-cac61b0f8856" alt="Download from Google Play" width="32%" /></a><a href="https://github.com/gkd-kit/gkd/releases"><img src="https://e.gkd.li/c1ef2bb9-7472-46d5-9806-81b4c37e5b4d" alt="Download from GitHub releases" width="32%" /></a>
+从 [本仓库 Releases](https://github.com/OldWooood/gkd/releases/latest) 下载 APK
 
-如遇问题请先查看 [疑难解答](https://gkd.li/guide/faq)
+通用问题可参考官方 [疑难解答](https://gkd.li/guide/faq)
 
 ## 截图
 
