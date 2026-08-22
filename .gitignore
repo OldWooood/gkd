@@ -14,5 +14,6 @@
 
 *.jks
 *.keystore
+/key.properties
 local.properties
 libs.versions.updates.toml

@@ -15,6 +15,26 @@ import kotlin.reflect.full.declaredMemberProperties
 val gitInfo = project.gitInfo
 val debugSuffixResources = project.readDebugSuffixResources()
 
+val keystoreProperties: Map<String, String> = rootProject.file("key.properties")
+    .takeIf { it.exists() }
+    ?.readLines()
+    ?.mapNotNull { line ->
+        line.substringBefore('#').split('=', limit = 2)
+            .takeIf { it.size == 2 }
+            ?.let { (k, v) -> k.trim() to v.trim() }
+            ?.takeIf { (_, v) -> v.isNotEmpty() }
+    }
+    ?.toMap()
+    ?: emptyMap()
+
+fun signingValue(vararg names: String): String? {
+    return names.firstNotNullOfOrNull { name ->
+        System.getenv(name)?.takeIf { it.isNotBlank() }
+            ?: keystoreProperties[name]
+            ?: providers.gradleProperty(name).orNull?.takeIf { it.isNotBlank() }
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.androidx.room)
@@ -56,13 +76,13 @@ android {
         resValues = true
     }
 
-    val gkdStoreFile = buildProperty("GKD_STORE_FILE").orNull
+    val gkdStoreFile = signingValue("GKD_STORE_FILE", "storeFile")
     val gkdSigningConfig = if (gkdStoreFile != null) {
         signingConfigs.create("gkd") {
             storeFile = file(gkdStoreFile)
-            storePassword = buildProperty("GKD_STORE_PASSWORD").orNull
-            keyAlias = buildProperty("GKD_KEY_ALIAS").orNull
-            keyPassword = buildProperty("GKD_KEY_PASSWORD").orNull
+            storePassword = signingValue("GKD_STORE_PASSWORD", "storePassword")
+            keyAlias = signingValue("GKD_KEY_ALIAS", "keyAlias")
+            keyPassword = signingValue("GKD_KEY_PASSWORD", "keyPassword")
         }
     } else {
         signingConfigs.getByName("debug")
