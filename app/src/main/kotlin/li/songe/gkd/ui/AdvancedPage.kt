@@ -1,6 +1,5 @@
 package li.songe.gkd.ui
 
-import android.app.Activity
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -45,12 +44,10 @@ import kotlinx.serialization.Serializable
 import li.songe.gkd.MainActivity
 import li.songe.gkd.R
 import li.songe.gkd.app
-import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.service.ActivityService
 import li.songe.gkd.service.ButtonService
 import li.songe.gkd.service.EventService
 import li.songe.gkd.service.HttpService
-import li.songe.gkd.service.ScreenshotService
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.component.CustomOutlinedTextField
 import li.songe.gkd.ui.component.AppAlertDialog
@@ -66,7 +63,6 @@ import li.songe.gkd.ui.share.LocalMainViewModel
 import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.itemPadding
 import li.songe.gkd.ui.style.titleItemPadding
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.ShortUrlSet
 import li.songe.gkd.util.launchAsFn
 import li.songe.gkd.util.launchTry
@@ -92,7 +88,6 @@ private fun AdvancedContent() {
     val store by storeFlow.collectAsStateWithLifecycle()
     val httpServer by HttpService.httpServerFlow.collectAsStateWithLifecycle()
     val localNetworkIps by HttpService.localNetworkIpsFlow.collectAsStateWithLifecycle()
-    val screenshotServiceRunning by ScreenshotService.isRunning.collectAsStateWithLifecycle()
     val buttonServiceRunning by ButtonService.isRunning.collectAsStateWithLifecycle()
     val activityServiceRunning by ActivityService.isRunning.collectAsStateWithLifecycle()
     val eventServiceRunning by EventService.isRunning.collectAsStateWithLifecycle()
@@ -117,25 +112,6 @@ private fun AdvancedContent() {
                 checked = store.autoClearMemorySubs,
                 onCheckedChange = vm::setAutoClearMemorySubs,
             )
-        }
-    }
-
-    fun setScreenshotServiceEnabled(enabled: Boolean) {
-        scope.launchTry {
-            if (!enabled) {
-                ScreenshotService.stop()
-                return@launchTry
-            }
-            if (!mainVm.permissionRequests.ensurePermissions(PermissionStates.notification)) {
-                return@launchTry
-            }
-            val activityResult = mainVm.activityResults.startActivity(
-                app.mediaProjectionManager.createScreenCaptureIntent(),
-            )
-            val intent = activityResult.data
-            if (activityResult.resultCode == Activity.RESULT_OK && intent != null) {
-                ScreenshotService.start(intent)
-            }
         }
     }
 
@@ -265,14 +241,6 @@ private fun AdvancedContent() {
                 subtitle = "应用界面节点信息及截图",
                 onClick = { mainVm.navigatePage(SnapshotPageRoute) },
             )
-            if (!AndroidTarget.R) {
-                TextSwitch(
-                    title = "截屏服务",
-                    subtitle = "生成快照需要获取屏幕截图",
-                    checked = screenshotServiceRunning,
-                    onCheckedChange = ::setScreenshotServiceEnabled,
-                )
-            }
             TextSwitch(
                 title = "快照按钮",
                 subtitle = "显示按钮点击保存快照",

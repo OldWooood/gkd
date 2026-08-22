@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.KeyboardUtils
 
 class ActivityImeController(
@@ -22,7 +21,6 @@ class ActivityImeController(
         field = MutableStateFlow(false)
 
     private val fullyHiddenFlow = MutableStateFlow(true)
-    private var removeSoftInputChangedListener: (() -> Unit)? = null
 
     private val imeVisible: Boolean
         get() = ViewCompat.getRootWindowInsets(activity.window.decorView)
@@ -59,27 +57,14 @@ class ActivityImeController(
     }
 
     override fun onCreate(owner: LifecycleOwner) {
-        if (AndroidTarget.R) {
-            ViewCompat.setWindowInsetsAnimationCallback(
-                activity.window.decorView,
-                animationCallback,
-            )
-        } else {
-            removeSoftInputChangedListener = KeyboardUtils.registerSoftInputChangedListener(
-                activity.window,
-            ) { height ->
-                fullyHiddenFlow.value = height == 0
-            }
-        }
+        ViewCompat.setWindowInsetsAnimationCallback(
+            activity.window.decorView,
+            animationCallback,
+        )
     }
 
     override fun onDestroy(owner: LifecycleOwner) {
-        if (AndroidTarget.R) {
-            ViewCompat.setWindowInsetsAnimationCallback(activity.window.decorView, null)
-        } else {
-            removeSoftInputChangedListener?.invoke()
-            removeSoftInputChangedListener = null
-        }
+        ViewCompat.setWindowInsetsAnimationCallback(activity.window.decorView, null)
         fullyHiddenFlow.value = true
         showAnimationRunningFlow.value = false
         owner.lifecycle.removeObserver(this)

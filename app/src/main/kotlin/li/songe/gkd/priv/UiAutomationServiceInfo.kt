@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import li.songe.gkd.app
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.util.AndroidTarget
 
 fun createUiAutomationServiceInfo(): AccessibilityServiceInfo {
     val resolveInfo = ResolveInfo().apply {
@@ -22,8 +21,6 @@ fun createUiAutomationServiceInfo(): AccessibilityServiceInfo {
         flags = rawInfo.flags or AccessibilityServiceInfoHidden.FLAG_FORCE_DIRECT_BOOT_AWARE
         toHidden.setCapabilities(rawInfo.capabilities)
         notificationTimeout = rawInfo.notificationTimeout
-        if (AndroidTarget.UPSIDE_DOWN_CAKE) {
-            toHidden.setAccessibilityTool(true)
-        }
+        toHidden.setAccessibilityTool(true)
     }
 }

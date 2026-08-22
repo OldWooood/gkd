@@ -90,9 +90,7 @@ private fun View.updateToastView() {
     if (this is TextView) {
         setTextSize(TypedValue.COMPLEX_UNIT_PX, 14.sp.px)
         setTextColor(if (darkTheme) Color.WHITE else Color.BLACK)
-        if (AndroidTarget.Q) {
-            breakStrategy = LineBreaker.BREAK_STRATEGY_SIMPLE
-        }
+        breakStrategy = LineBreaker.BREAK_STRATEGY_SIMPLE
     }
     background = GradientDrawable().apply {
         setColor((if (darkTheme) "#303030" else "#fafafa").toColorInt())

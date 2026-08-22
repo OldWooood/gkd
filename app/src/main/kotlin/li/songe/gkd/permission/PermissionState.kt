@@ -16,7 +16,6 @@ import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.priv.CompatAppOpsService
 import li.songe.gkd.priv.privilegeContextFlow
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.toast
 import li.songe.gkd.util.updateAllAppInfo
 import li.songe.gkd.util.updateAppMutex
@@ -94,11 +93,7 @@ object PermissionStates {
         PermissionState(
             name = "特殊用途的前台服务",
             check = {
-                if (AndroidTarget.UPSIDE_DOWN_CAKE) {
-                    checkAllowedOp(AppOpsManagerHidden.OPSTR_FOREGROUND_SERVICE_SPECIAL_USE)
-                } else {
-                    true
-                }
+                checkAllowedOp(AppOpsManagerHidden.OPSTR_FOREGROUND_SERVICE_SPECIAL_USE)
             },
             resolution = PermissionResolution(
                 message = "「特殊用途的前台服务」已被限制，请前往特权服务重新授权",
@@ -110,8 +105,7 @@ object PermissionStates {
 
     // https://github.com/orgs/gkd-kit/discussions/1234
     private fun checkAccessA11y(): Boolean {
-        return !AndroidTarget.Q ||
-                checkAllowedOp(AppOpsManagerHidden.OPSTR_ACCESS_ACCESSIBILITY)
+        return checkAllowedOp(AppOpsManagerHidden.OPSTR_ACCESS_ACCESSIBILITY)
     }
 
     private fun checkCreateA11yOverlay(): Boolean {
@@ -125,7 +119,6 @@ object PermissionStates {
     private fun checkAccessRestrictedSettings(): Boolean {
         return if (
             canRestrictsRead &&
-            AndroidTarget.UPSIDE_DOWN_CAKE &&
             app.checkGrantedPermission(Manifest_permission_GET_APP_OPS_STATS)
         ) {
             try {
@@ -206,15 +199,9 @@ object PermissionStates {
     val writeExternalStorage by lazy {
         requestablePermissionState(
             name = "写入外部存储权限",
-            purpose = "用于在 Android 9 及以下保存截图或文件到公共存储",
+            purpose = "用于在旧版本安卓保存截图或文件到公共存储",
             permission = PermissionLists.getWriteExternalStoragePermission(),
-            check = {
-                if (AndroidTarget.Q) {
-                    true
-                } else {
-                    app.checkGrantedPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                }
-            },
+            check = { true },
         )
     }
 

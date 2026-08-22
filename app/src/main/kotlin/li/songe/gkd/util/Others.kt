@@ -71,12 +71,7 @@ fun MainActivity.fixSomeProblems() {
 
 private fun Activity.fixTransparentNavigationBar() {
     // 修复在浅色主题下导航栏背景不透明的问题
-    if (AndroidTarget.Q) {
-        window.isNavigationBarContrastEnforced = false
-    } else {
-        @Suppress("DEPRECATION")
-        window.navigationBarColor = Color.TRANSPARENT
-    }
+    window.isNavigationBarContrastEnforced = false
 }
 
 

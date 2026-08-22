@@ -42,7 +42,6 @@ import li.songe.gkd.ui.component.PerfTopAppBar
 import li.songe.gkd.ui.share.LocalMainViewModel
 import li.songe.gkd.ui.style.iconTextSize
 import li.songe.gkd.ui.style.scaffoldPadding
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.client
 import li.songe.gkd.util.copyText
@@ -154,9 +153,7 @@ fun WebViewPage(route: WebViewRoute) {
                     @SuppressLint("SetJavaScriptEnabled")
                     javaScriptEnabled = true
                     domStorageEnabled = true
-                    if (AndroidTarget.TIRAMISU) {
-                        setAlgorithmicDarkeningAllowed(false)
-                    }
+                    setAlgorithmicDarkeningAllowed(false)
                 }
             }
         )

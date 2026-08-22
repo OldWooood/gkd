@@ -1,7 +1,6 @@
 package li.songe.gkd.a11y
 
 import android.util.Log
-import android.util.LruCache
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.atomicfu.atomic
 import li.songe.gkd.META
@@ -18,10 +17,6 @@ import li.songe.selector.getCharSequenceAttr
 import li.songe.selector.getCharSequenceInvoke
 import li.songe.selector.getIntInvoke
 
-
-private operator fun <K, V> LruCache<K, V>.set(child: K, value: V): V {
-    return put(child, value)
-}
 
 private fun List<Any>.getInt(i: Int = 0) = get(i) as Int
 
@@ -42,17 +37,33 @@ class A11yContext(
     private val a11yEngine: A11yRuleEngine,
     private val interruptable: Boolean = true,
 ) {
-    private var childCache =
-        LruCache<Pair<AccessibilityNodeInfo, Int>, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
-    private var indexCache = LruCache<AccessibilityNodeInfo, Int>(MAX_CACHE_SIZE)
-    private var parentCache = LruCache<AccessibilityNodeInfo, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
+    private var childrenCache = HashMap<AccessibilityNodeInfo, Array<AccessibilityNodeInfo?>>(
+        MAX_CACHE_SIZE
+    )
+    private var indexCache = HashMap<AccessibilityNodeInfo, Int>(MAX_CACHE_SIZE)
+    private var parentCache = HashMap<AccessibilityNodeInfo, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
     val rootCache = atomic<AccessibilityNodeInfo?>(null)
 
+    private fun <K, V> putBounded(map: HashMap<K, V>, key: K, value: V) {
+        if (map.size >= MAX_CACHE_SIZE) {
+            map.clear()
+        }
+        map[key] = value
+    }
+
+    private fun getChildrenArray(node: AccessibilityNodeInfo): Array<AccessibilityNodeInfo?> {
+        return childrenCache[node] ?: run {
+            val array = arrayOfNulls<AccessibilityNodeInfo>(
+                node.childCount.coerceAtMost(MAX_CHILD_SIZE)
+            )
+            putBounded(childrenCache, node, array)
+            array
+        }
+    }
+
     private fun clearChildCache(node: AccessibilityNodeInfo) {
-        repeat(node.childCount.coerceAtMost(MAX_CHILD_SIZE)) { i ->
-            childCache.remove(node to i)?.let {
-                clearChildCache(it)
-            }
+        childrenCache.remove(node)?.forEach { child ->
+            child?.let { clearChildCache(it) }
         }
     }
 
@@ -64,7 +75,10 @@ class A11yContext(
             clearChildCache(eventNode)
             parentCache[eventNode]?.let { p ->
                 getPureIndex(eventNode)?.let { i ->
-                    childCache[p to i] = eventNode
+                    val array = childrenCache[p]
+                    if (array != null && i < array.size) {
+                        array[i] = eventNode
+                    }
                 }
             }
             if (rootCache.value == eventNode) {
@@ -80,21 +94,22 @@ class A11yContext(
             }
         }
         if (META.debuggable) {
-            val sizeList = listOf(childCache.size(), parentCache.size(), indexCache.size())
+            val sizeList = listOf(childrenCache.size, parentCache.size, indexCache.size)
             if (sizeList.any { it > 0 }) {
                 Log.d("cache", "clear cache -> $sizeList")
             }
         }
         try {
-            childCache.evictAll()
-            parentCache.evictAll()
-            indexCache.evictAll()
+            childrenCache.clear()
+            parentCache.clear()
+            indexCache.clear()
+            clearNodeTimeCache()
         } catch (_: Exception) {
             // https://github.com/gkd-kit/gkd/issues/664
             // 在某些机型上 未知原因 缓存不一致 导致删除失败
-            childCache = LruCache(MAX_CACHE_SIZE)
-            indexCache = LruCache(MAX_CACHE_SIZE)
-            parentCache = LruCache(MAX_CACHE_SIZE)
+            childrenCache = HashMap(MAX_CACHE_SIZE)
+            indexCache = HashMap(MAX_CACHE_SIZE)
+            parentCache = HashMap(MAX_CACHE_SIZE)
         }
     }
 
@@ -189,7 +204,7 @@ class A11yContext(
         parentCache[node].notExpiredNode?.let { return it }
         return getA11Parent(node).apply {
             if (this != null) {
-                parentCache[node] = this
+                putBounded(parentCache, node, this)
             } else {
                 rootCache.value = node
             }
@@ -200,10 +215,17 @@ class A11yContext(
         if (index !in 0 until node.childCount) {
             return null
         }
-        return childCache[node to index].notExpiredNode ?: getA11Child(node, index)?.also { child ->
-            indexCache[child] = index
-            parentCache[child] = node
-            childCache[node to index] = child
+        val array = getChildrenArray(node)
+        val cached = array.getOrNull(index)
+        if (cached != null && cached.notExpiredNode != null) {
+            return cached
+        }
+        return getA11Child(node, index)?.also { child ->
+            putBounded(indexCache, child, index)
+            putBounded(parentCache, child, node)
+            if (index < array.size) {
+                array[index] = child
+            }
         }
     }
 

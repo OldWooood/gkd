@@ -29,12 +29,9 @@ object BarUtils {
 
     @WorkerThread
     fun checkStatusBarVisible(): Boolean? {
-        val r = if (AndroidTarget.R) {
-            // 后台/小窗模式下依然可判断
-            app.windowManager.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.statusBars()).top > 0
-        } else {
-            null
-        }
+        // 后台/小窗模式下依然可判断
+        val r = app.windowManager.currentWindowMetrics.windowInsets
+            .getInsets(WindowInsets.Type.statusBars()).top > 0
         if (r == false) return r
         val windows = A11yRuleEngine.compatWindows()
         val rect = Rect() // Rect(0, 0 - 1280, 152)

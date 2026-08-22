@@ -9,13 +9,12 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.getAndUpdate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import li.songe.gkd.META
@@ -34,7 +33,6 @@ import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.priv.uiAutomationFlow
 import li.songe.gkd.store.actualBlockA11yAppList
 import li.songe.gkd.store.storeFlow
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.runMainPost
@@ -43,14 +41,16 @@ import li.songe.gkd.util.systemUiAppId
 import li.songe.selector.MatchOption
 import li.songe.selector.Selector
 import java.util.concurrent.Executors
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.milliseconds
 
 
 private val eventDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 private val queryDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+
+private const val FAST_EVENT_DELIVERY_TIMEOUT = 0L
+private const val IDLE_EVENT_DELIVERY_TIMEOUT = 100L
+private const val ACTIVITY_FRESH_WINDOW = 3000L
 
 private val latestServiceMode = atomic(0)
 private val latestServiceTime = atomic(0L)
@@ -67,6 +67,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         val serviceTime = System.currentTimeMillis()
         latestServiceMode.value = service.mode.value
         latestServiceTime.value = serviceTime
+        refreshEventDeliveryTimeout()
         if (storeFlow.value.enableBlockA11yAppList && !actualBlockA11yAppList.contains(topAppIdFlow.value)) {
             startQueryJob(byForced = true)
         }
@@ -90,7 +91,18 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 scene = ActivityScene.ScreenOn
             )
         }
+        refreshEventDeliveryTimeout()
         startQueryJob()
+    }
+
+    fun onTopActivityChanged(idChanged: Boolean) {
+        if (!effective) return
+        scope.launch(actionDispatcher) {
+            refreshEventDeliveryTimeout()
+            if (idChanged) {
+                prewarmActiveWindow()
+            }
+        }
     }
 
     val safeActiveWindow: AccessibilityNodeInfo?
@@ -118,7 +130,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         if (!effective) return
         if (!event.isUseful()) return
         // 拒绝副屏无障碍事件
-        if (AndroidTarget.TIRAMISU && event.displayId != Display.DEFAULT_DISPLAY) return
+        if (event.displayId != Display.DEFAULT_DISPLAY) return
         onA11yFeatEvent(event)
         if (event.eventType == CONTENT_CHANGED) {
             if (!isInteractive) return // 屏幕关闭后仍然有无障碍事件 type:2048, time:8094, app:com.miui.aod, cls:android.widget.TextView
@@ -210,31 +222,20 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     private var lastAppId: String? = null
     private suspend fun getTimeoutAppId(): String? {
         if (lastAppId != null && System.currentTimeMillis() - lastGetAppIdTime <= 100) return lastAppId
-        // 某些应用通过无障碍获取 safeActiveWindow 耗时长，导致多个事件连续堆积堵塞，无法检测到 appId 切换导致状态异常
+        // 特权通道读取栈顶组件远快于无障碍 root 节点获取,
+        // 优先使用可避免 safeActiveWindow 耗时导致事件堆积堵塞
         // https://github.com/gkd-kit/gkd/issues/622
-        lastAppId = withTimeoutOrNull(100.milliseconds) {
-            runInterruptible(Dispatchers.IO) { safeActiveWindowAppId }
-        } ?: privilegeContextFlow.value?.run { topCpn()?.packageName }
+        lastAppId = privilegeContextFlow.value?.run { topCpn()?.packageName }
+            ?: withTimeoutOrNull(100.milliseconds) {
+                runInterruptible(Dispatchers.IO) { safeActiveWindowAppId }
+            }
         lastGetAppIdTime = System.currentTimeMillis()
         return lastAppId
     }
 
-    // 某些场景耗时 5000 ms
     private suspend fun getTimeoutActiveWindow(): AccessibilityNodeInfo? {
-        return suspendCancellableCoroutine { s ->
-            val temp = atomic<Continuation<AccessibilityNodeInfo?>?>(s)
-            scope.launch(Dispatchers.IO) {
-                delay(500L.milliseconds)
-                if (s.isActive) {
-                    temp.getAndUpdate { null }?.resume(null)
-                }
-            }
-            scope.launch(Dispatchers.IO) {
-                val a = safeActiveWindow
-                if (s.isActive) {
-                    temp.getAndUpdate { null }?.resume(a)
-                }
-            }
+        return withTimeoutOrNull(500.milliseconds) {
+            runInterruptible(Dispatchers.IO) { safeActiveWindow }
         }
     }
 
@@ -287,6 +288,54 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 delay(300.milliseconds)
                 startQueryJob(byForced = true)
             }
+        }
+    }
+
+    private fun prewarmActiveWindow() {
+        if (!storeFlow.value.enableMatch) return
+        val activityRule = activityRuleFlow.value
+        if (activityRule.skipMatch || activityRule.currentRules.isEmpty()) return
+        scope.launchTry(Dispatchers.IO) {
+            safeActiveWindow
+        }
+    }
+
+    private var latestEventDeliveryTimeout = -1L
+    private var eventDeliveryRestoreJob: Job? = null
+
+    private fun refreshEventDeliveryTimeout() {
+        val timeoutMillis = computeEventDeliveryTimeout()
+        applyEventDeliveryTimeout(timeoutMillis)
+        eventDeliveryRestoreJob?.cancel()
+        if (timeoutMillis == FAST_EVENT_DELIVERY_TIMEOUT) {
+            eventDeliveryRestoreJob = scope.launch(actionDispatcher) {
+                delay(ACTIVITY_FRESH_WINDOW + 500L)
+                applyEventDeliveryTimeout(computeEventDeliveryTimeout())
+            }
+        }
+    }
+
+    private fun computeEventDeliveryTimeout(): Long {
+        if (!storeFlow.value.enableMatch) return IDLE_EVENT_DELIVERY_TIMEOUT
+        val activityRule = activityRuleFlow.value
+        if (activityRule.skipMatch || activityRule.currentRules.isEmpty()) return IDLE_EVENT_DELIVERY_TIMEOUT
+        val freshLaunch = System.currentTimeMillis() - appChangeTime < ACTIVITY_FRESH_WINDOW
+        return if (freshLaunch || activityRule.hasFeatureAction) {
+            FAST_EVENT_DELIVERY_TIMEOUT
+        } else {
+            IDLE_EVENT_DELIVERY_TIMEOUT
+        }
+    }
+
+    private fun applyEventDeliveryTimeout(timeoutMillis: Long) {
+        if (timeoutMillis == latestEventDeliveryTimeout) return
+        latestEventDeliveryTimeout = timeoutMillis
+        val accessibilityService = service as? AccessibilityService ?: return
+        try {
+            val info = accessibilityService.serviceInfo ?: return
+            info.notificationTimeout = timeoutMillis
+            accessibilityService.setServiceInfo(info)
+        } catch (_: Throwable) {
         }
     }
 

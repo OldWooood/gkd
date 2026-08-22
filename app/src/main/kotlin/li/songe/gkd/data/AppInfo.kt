@@ -9,7 +9,6 @@ import kotlinx.serialization.Serializable
 import li.songe.gkd.app
 import li.songe.gkd.priv.currentUserId
 import li.songe.gkd.priv.toHidden
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.pkgIcon
 
 @Serializable
@@ -41,12 +40,7 @@ val selfAppInfo by lazy {
 }
 
 private val PackageInfo.compatVersionCode: Int
-    get() = if (AndroidTarget.P) {
-        longVersionCode.toInt()
-    } else {
-        @Suppress("DEPRECATION")
-        versionCode
-    }
+    get() = longVersionCode.toInt()
 
 val ApplicationInfo.isSystem: Boolean
     get() = flags and ApplicationInfo.FLAG_SYSTEM != 0 || flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0

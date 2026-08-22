@@ -59,7 +59,6 @@ import coil3.decode.Decoder
 import coil3.disk.DiskCache
 import coil3.fetch.Fetcher
 import coil3.gif.AnimatedImageDecoder
-import coil3.gif.GifDecoder
 import coil3.imageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
@@ -78,7 +77,6 @@ import li.songe.gkd.ui.component.PerfIcon
 import li.songe.gkd.ui.component.PerfIconButton
 import li.songe.gkd.ui.component.PerfTopAppBar
 import li.songe.gkd.ui.share.LocalMainViewModel
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.coilCacheDir
 import li.songe.gkd.util.throttle
 import me.saket.telephoto.zoomable.ZoomableContentLocation
@@ -113,11 +111,7 @@ private val imageLoader by lazy {
                 .build()
         }
         .components {
-            if (AndroidTarget.P) {
-                add(AnimatedImageDecoder.Factory())
-            } else {
-                add(GifDecoder.Factory())
-            }
+            add(AnimatedImageDecoder.Factory())
             add(
                 OkHttpNetworkFetcherFactory(
                     callFactory = {

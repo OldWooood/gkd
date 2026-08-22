@@ -16,7 +16,6 @@ import kotlinx.coroutines.withContext
 import li.songe.gkd.a11y.A11yCommonImpl
 import li.songe.gkd.a11y.A11yRuleEngine
 import li.songe.gkd.store.updateEnableAutomator
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.toast
@@ -177,15 +176,11 @@ val uiAutomationFlow = MutableStateFlow<AutomationService?>(null)
 val uiAutomationOccupiedFlow = MutableStateFlow(false)
 
 private val remoteCallbackThreadField by lazy {
-    if (AndroidTarget.P) {
-        // UiAutomation 在 CONNECTING 阶段同步失败时，disconnect() 会在进入自身的
-        // finally 前直接抛错，因此需要通过内部字段兜底关闭其回调线程。
-        @SuppressLint("SoonBlockedPrivateApi")
-        UiAutomation::class.java.getDeclaredField("mRemoteCallbackThread").apply {
-            isAccessible = true
-        }
-    } else {
-        null
+    // UiAutomation 在 CONNECTING 阶段同步失败时，disconnect() 会在进入自身的
+    // finally 前直接抛错，因此需要通过内部字段兜底关闭其回调线程。
+    @SuppressLint("SoonBlockedPrivateApi")
+    UiAutomation::class.java.getDeclaredField("mRemoteCallbackThread").apply {
+        isAccessible = true
     }
 }
 

@@ -20,7 +20,6 @@ import li.songe.gkd.a11y.topActivityFlow
 import li.songe.gkd.a11y.updateTopActivity
 import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.store.updateEnableAutomator
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.DefaultA11yLifeImpl
 import li.songe.gkd.util.LogUtils
@@ -37,35 +36,31 @@ abstract class A11yService : AccessibilityService(), OnA11yLife by DefaultA11yLi
     override val windowNodeInfo: AccessibilityNodeInfo? get() = rootInActiveWindow
     override val windowInfos: List<AccessibilityWindowInfo> get() = windows
     override suspend fun screenshot(): Bitmap? = suspendCancellableCoroutine { cont ->
-        if (AndroidTarget.R) {
-            takeScreenshot(
-                Display.DEFAULT_DISPLAY,
-                application.mainExecutor,
-                object : TakeScreenshotCallback {
-                    override fun onFailure(errorCode: Int) {
-                        if (cont.isActive) {
-                            cont.resume(null)
-                        }
-                    }
-
-                    override fun onSuccess(screenshot: ScreenshotResult) {
-                        try {
-                            if (cont.isActive) {
-                                cont.resume(
-                                    Bitmap.wrapHardwareBuffer(
-                                        screenshot.hardwareBuffer, screenshot.colorSpace
-                                    )
-                                )
-                            }
-                        } finally {
-                            screenshot.hardwareBuffer.close()
-                        }
+        takeScreenshot(
+            Display.DEFAULT_DISPLAY,
+            application.mainExecutor,
+            object : TakeScreenshotCallback {
+                override fun onFailure(errorCode: Int) {
+                    if (cont.isActive) {
+                        cont.resume(null)
                     }
                 }
-            )
-        } else {
-            cont.resume(null)
-        }
+
+                override fun onSuccess(screenshot: ScreenshotResult) {
+                    try {
+                        if (cont.isActive) {
+                            cont.resume(
+                                Bitmap.wrapHardwareBuffer(
+                                    screenshot.hardwareBuffer, screenshot.colorSpace
+                                )
+                            )
+                        }
+                    } finally {
+                        screenshot.hardwareBuffer.close()
+                    }
+                }
+            }
+        )
     }
 
     override val ruleEngine by lazy { A11yRuleEngine(this) }

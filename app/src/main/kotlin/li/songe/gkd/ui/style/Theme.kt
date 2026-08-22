@@ -29,7 +29,6 @@ import li.songe.gkd.app
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.share.LocalDarkTheme
 import li.songe.gkd.ui.share.LocalIsTalkbackEnabled
-import li.songe.gkd.util.AndroidTarget
 
 private val LightColorScheme = lightColorScheme()
 private val DarkColorScheme = darkColorScheme()
@@ -50,8 +49,8 @@ fun AppTheme(
         if (invertedTheme) !it else it
     }
     val colorScheme = when {
-        AndroidTarget.S && store.enableDynamicColor && darkTheme -> dynamicDarkColorScheme(app)
-        AndroidTarget.S && store.enableDynamicColor && !darkTheme -> dynamicLightColorScheme(app)
+        store.enableDynamicColor && darkTheme -> dynamicDarkColorScheme(app)
+        store.enableDynamicColor && !darkTheme -> dynamicLightColorScheme(app)
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

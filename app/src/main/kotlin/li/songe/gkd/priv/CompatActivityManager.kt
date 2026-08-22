@@ -5,7 +5,6 @@ import android.app.IActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import li.songe.gkd.util.AndroidTarget
 import priv.kit.core.binder.PrivilegeBinderWrapper
 
 class CompatActivityManager {
@@ -15,11 +14,7 @@ class CompatActivityManager {
         ),
     )
 
-    fun getTasks(maxNum: Int = 1): List<ActivityManager.RunningTaskInfo> = if (AndroidTarget.P) {
-        value.getTasks(maxNum)
-    } else {
-        value.getTasks(maxNum, 0)
-    }
+    fun getTasks(maxNum: Int = 1): List<ActivityManager.RunningTaskInfo> = value.getTasks(maxNum)
 
     fun startService(
         intent: Intent,
@@ -27,24 +22,13 @@ class CompatActivityManager {
         callingPackage: String,
         callingFeatureId: String?,
         userId: Int = currentUserId,
-    ): ComponentName = if (AndroidTarget.R) {
-        value.startService(
-            null,
-            intent,
-            intent.type,
-            requireForeground,
-            callingPackage,
-            callingFeatureId,
-            userId,
-        )
-    } else {
-        value.startService(
-            null,
-            intent,
-            intent.type,
-            requireForeground,
-            callingPackage,
-            userId,
-        )
-    }
+    ): ComponentName = value.startService(
+        null,
+        intent,
+        intent.type,
+        requireForeground,
+        callingPackage,
+        callingFeatureId,
+        userId,
+    )
 }

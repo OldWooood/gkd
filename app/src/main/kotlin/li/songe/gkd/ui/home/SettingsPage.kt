@@ -76,7 +76,6 @@ import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.iconTextSize
 import li.songe.gkd.ui.style.itemHorizontalPadding
 import li.songe.gkd.ui.style.titleItemPadding
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.DarkThemeOption
 import li.songe.gkd.util.findOption
 import li.songe.gkd.util.launchTry
@@ -506,15 +505,13 @@ fun useSettingsPage(): ScaffoldExt {
                 }
             )
 
-            if (AndroidTarget.S) {
-                TextSwitch(
-                    title = "动态配色",
-                    checked = store.enableDynamicColor,
-                    onCheckedChange = {
-                        vm.setDynamicColor(it)
-                    }
-                )
-            }
+            TextSwitch(
+                title = "动态配色",
+                checked = store.enableDynamicColor,
+                onCheckedChange = {
+                    vm.setDynamicColor(it)
+                }
+            )
 
             Text(
                 text = "其他",

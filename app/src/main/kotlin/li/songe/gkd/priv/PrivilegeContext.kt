@@ -27,7 +27,6 @@ class PrivilegeContext private constructor(
     val inputManager = CompatInputManager()
     val a11yManager = CompatAccessibilityManager()
     val wmManager = CompatWindowManager()
-    private val userService = IUserService.Stub.asInterface(userServiceConnection.binder)
     private var taskStackListenerRegistered = false
 
     private fun initialize() {
@@ -68,7 +67,7 @@ class PrivilegeContext private constructor(
     fun topCpn() = topTask()?.topActivity
 
     fun screenshot(): Bitmap? {
-        return CompatScreenshot.capture(app, wmManager.value, userService)
+        return CompatScreenshot.capture(app, wmManager.value)
     }
 
     private fun setAllowSelfMode(code: Int) {
@@ -86,15 +85,9 @@ class PrivilegeContext private constructor(
     private fun allowAllSelfMode() {
         setAllowSelfMode(AppOpsManagerHidden.OP_POST_NOTIFICATION)
         setAllowSelfMode(AppOpsManagerHidden.OP_SYSTEM_ALERT_WINDOW)
-        if (AndroidTarget.Q) {
-            setAllowSelfMode(AppOpsManagerHidden.OP_ACCESS_ACCESSIBILITY)
-        }
-        if (AndroidTarget.TIRAMISU) {
-            setAllowSelfMode(AppOpsManagerHidden.OP_ACCESS_RESTRICTED_SETTINGS)
-        }
-        if (AndroidTarget.UPSIDE_DOWN_CAKE) {
-            setAllowSelfMode(AppOpsManagerHidden.OP_FOREGROUND_SERVICE_SPECIAL_USE)
-        }
+        setAllowSelfMode(AppOpsManagerHidden.OP_ACCESS_ACCESSIBILITY)
+        setAllowSelfMode(AppOpsManagerHidden.OP_ACCESS_RESTRICTED_SETTINGS)
+        setAllowSelfMode(AppOpsManagerHidden.OP_FOREGROUND_SERVICE_SPECIAL_USE)
         if (CompatAppOpsService.supportA11yOverlay) {
             setAllowSelfMode(AppOpsManagerHidden.OP_CREATE_ACCESSIBILITY_OVERLAY)
         }
@@ -114,12 +107,7 @@ class PrivilegeContext private constructor(
         }
         grantSelfPermission(PermissionStates.Manifest_permission_GET_APP_OPS_STATS)
         grantSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
-        if (!AndroidTarget.Q) {
-            grantSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-        if (AndroidTarget.TIRAMISU) {
-            grantSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        grantSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
         if (AndroidTarget.CINNAMON_BUN) {
             grantSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK)
         }

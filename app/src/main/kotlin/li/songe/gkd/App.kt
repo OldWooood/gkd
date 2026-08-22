@@ -38,7 +38,6 @@ import li.songe.gkd.priv.initPrivilege
 import li.songe.gkd.service.clearHttpSubs
 import li.songe.gkd.service.initA11yWhiteAppList
 import li.songe.gkd.store.initStore
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.PKG_FLAGS
 import li.songe.gkd.util.deviceInfoDesc
@@ -116,9 +115,7 @@ class App : Application() {
             followDeathDelayMillis = 0,
             activeReconnectOnOwnerDeath = false,
         )
-        if (AndroidTarget.P) {
-            HiddenApiBypass.addHiddenApiExemptions("L")
-        }
+        HiddenApiBypass.addHiddenApiExemptions("L")
     }
 
     fun registerObserver(
@@ -212,12 +209,7 @@ class App : Application() {
     val launcherApps by lazy { getSystemService(LAUNCHER_APPS_SERVICE) as LauncherApps }
 
     val compatDisplay: Display
-        get() = if (AndroidTarget.R) {
-            displayManager.getDisplay(Display.DEFAULT_DISPLAY)
-        } else {
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay
-        }
+        get() = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
 
     override fun onCreate() {
         super.onCreate()

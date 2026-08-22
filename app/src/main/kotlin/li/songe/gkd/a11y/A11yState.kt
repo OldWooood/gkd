@@ -25,7 +25,6 @@ import li.songe.gkd.db.DbSet
 import li.songe.gkd.service.updateTopTaskAppId
 import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.checkAppBlockMatch
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.PKG_FLAGS
 import li.songe.gkd.util.RuleSummary
@@ -232,6 +231,7 @@ fun updateTopActivity(
             }
         }
         activityRuleFlow.value = newActivityRule
+        A11yRuleEngine.instance?.onTopActivityChanged(idChanged)
         LogUtils.d(
             "${oldActivity.format()} -> ${topActivityFlow.value.format()} (scene=$scene)",
             loc = loc,
@@ -262,11 +262,9 @@ fun updateSystemDefaultAppId() {
     if (app.getPkgInfo(launcherAppId)?.applicationInfo?.isSystem == true) {
         systemRecentCn = launcherCn
     } else {
-        if (AndroidTarget.P) {
-            systemRecentCn = ComponentName.unflattenFromString(
-                app.getString(com.android.internal.R.string.config_recentsComponentName)
-            ) ?: systemRecentCn
-        }
+        systemRecentCn = ComponentName.unflattenFromString(
+            app.getString(com.android.internal.R.string.config_recentsComponentName)
+        ) ?: systemRecentCn
         if (systemRecentCn.packageName.isEmpty()) {
             // https://github.com/android-cs/8/blob/main/packages/SystemUI/src/com/android/systemui/recents/RecentsActivity.java
             systemRecentCn = ComponentName(

@@ -15,7 +15,6 @@ import androidx.core.net.toUri
 import li.songe.gkd.MainActivity
 import li.songe.gkd.app
 import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.componentName
 
@@ -62,7 +61,6 @@ object NotificationDispatcher {
     }
 
     private fun Service.canStartForeground(): Boolean {
-        if (!AndroidTarget.UPSIDE_DOWN_CAKE) return true
         val serviceInfo = packageManager.getServiceInfo(
             ComponentName(this, javaClass),
             PackageManager.ComponentInfoFlags.of(0),
@@ -86,7 +84,7 @@ object NotificationDispatcher {
                 service,
                 notification.id,
                 build(notification),
-                if (AndroidTarget.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST else -1,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST,
             )
             true
         } catch (e: SecurityException) {

@@ -9,11 +9,11 @@ import kotlinx.coroutines.flow.StateFlow
 import li.songe.gkd.app
 import li.songe.gkd.contentObserver
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.OnSimpleLife
 import li.songe.gkd.util.mapState
 import li.songe.selector.initDefaultTypeInfo
 import kotlin.contracts.contract
+import java.util.concurrent.ConcurrentHashMap
 
 context(context: OnSimpleLife)
 fun useEnabledA11yServicesFlow(): StateFlow<Set<ComponentName>> {
@@ -72,34 +72,33 @@ fun AccessibilityNodeInfo.getVid(): CharSequence? {
 const val MAX_CHILD_SIZE = 512
 const val MAX_DESCENDANTS_SIZE = 4096
 
-private const val A11Y_NODE_TIME_KEY = "generatedTime"
+private val nodeTimeCache = ConcurrentHashMap<AccessibilityNodeInfo, Long>()
+
+fun clearNodeTimeCache() {
+    nodeTimeCache.clear()
+}
+
 fun AccessibilityNodeInfo.setGeneratedTime(): AccessibilityNodeInfo {
-    extras.putLong(A11Y_NODE_TIME_KEY, System.currentTimeMillis())
+    if (nodeTimeCache.size >= MAX_DESCENDANTS_SIZE) {
+        nodeTimeCache.clear()
+    }
+    nodeTimeCache[this] = System.currentTimeMillis()
     return this
 }
 
 fun AccessibilityNodeInfo.isExpired(expiryMillis: Long): Boolean {
-    val generatedTime = extras.getLong(A11Y_NODE_TIME_KEY, -1)
-    if (generatedTime == -1L) {
-        // https://github.com/gkd-kit/gkd/issues/759
-        return true
-    }
+    val generatedTime = nodeTimeCache[this] ?: return true
     return (System.currentTimeMillis() - generatedTime) > expiryMillis
 }
 
 val typeInfo by lazy { initDefaultTypeInfo().globalType }
 
 val AccessibilityNodeInfo.compatChecked: Boolean?
-    get() = if (AndroidTarget.BAKLAVA) {
-        when (checked) {
-            AccessibilityNodeInfo.CHECKED_STATE_TRUE -> true
-            AccessibilityNodeInfo.CHECKED_STATE_FALSE -> false
-            AccessibilityNodeInfo.CHECKED_STATE_PARTIAL -> null
-            else -> null
-        }
-    } else {
-        @Suppress("DEPRECATION")
-        isChecked
+    get() = when (checked) {
+        AccessibilityNodeInfo.CHECKED_STATE_TRUE -> true
+        AccessibilityNodeInfo.CHECKED_STATE_FALSE -> false
+        AccessibilityNodeInfo.CHECKED_STATE_PARTIAL -> null
+        else -> null
     }
 
 

@@ -34,7 +34,6 @@ import li.songe.gkd.app
 import li.songe.gkd.notif.NotificationCatalog
 import li.songe.gkd.notif.StopServiceReceiver
 import li.songe.gkd.priv.toHidden
-import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.DefaultSimpleLifeImpl
 import li.songe.gkd.util.OnSimpleLife
 import li.songe.gkd.util.ScreenUtils
@@ -113,9 +112,7 @@ class TrackService : LifecycleService(), SavedStateRegistryOwner,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.START or Gravity.TOP
-            if (AndroidTarget.S) {
-                alpha = app.inputManager.maximumObscuringOpacityForTouch
-            }
+            alpha = app.inputManager.maximumObscuringOpacityForTouch
         }
         private val subScope = MainScope()
         private val boundsRect = Rect()
@@ -258,7 +255,6 @@ class TrackService : LifecycleService(), SavedStateRegistryOwner,
     }
 
     private fun recalcOverlappingAlpha() {
-        if (!AndroidTarget.S) return
         val maxOpacity = app.inputManager.maximumObscuringOpacityForTouch
         val entries = layerMap.values.mapNotNull { layer ->
             layer.getRect()?.let { rect -> layer to rect }

@@ -24,7 +24,7 @@ plugins {
 object Cfg {
     val compileSdk get() = 37
     val buildToolsVersion get() = "37.0.0"
-    val minSdk get() = 26
+    val minSdk get() = 36
     val targetSdk get() = compileSdk
     val sourceVersion = JavaVersion.VERSION_11
     val targetVersion get() = sourceVersion

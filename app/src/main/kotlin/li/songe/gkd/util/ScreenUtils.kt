@@ -2,21 +2,14 @@ package li.songe.gkd.util
 
 import android.content.res.Configuration
 import android.content.res.Resources
-import android.graphics.Point
 import androidx.compose.ui.unit.IntSize
 import li.songe.gkd.app
 
 
 object ScreenUtils {
-    fun getScreenSize(): IntSize = if (AndroidTarget.R) {
+    fun getScreenSize(): IntSize {
         val b = app.windowManager.currentWindowMetrics.bounds
-        IntSize(b.width(), b.height())
-    } else {
-        val p = Point().apply {
-            @Suppress("DEPRECATION")
-            app.compatDisplay.getRealSize(this)
-        }
-        IntSize(p.x, p.y)
+        return IntSize(b.width(), b.height())
     }
 
     fun getScreenWidth(): Int = getScreenSize().width

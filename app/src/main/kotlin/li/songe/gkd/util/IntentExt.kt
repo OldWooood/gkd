@@ -41,26 +41,17 @@ fun MainActivity.shareFile(file: File, title: String) {
 }
 
 suspend fun MainActivity.saveFileToDownloads(file: File) {
-    if (AndroidTarget.Q) {
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+    val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
+        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+    }
+    withContext(Dispatchers.IO) {
+        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: error("创建URI失败")
+        contentResolver.openOutputStream(uri)?.use { outputStream ->
+            outputStream.write(file.readBytes())
+            outputStream.flush()
         }
-        withContext(Dispatchers.IO) {
-            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: error("创建URI失败")
-            contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(file.readBytes())
-                outputStream.flush()
-            }
-        }
-    } else {
-        if (!mainVm.permissionRequests.ensurePermissions(PermissionStates.writeExternalStorage)) return
-        val targetFile = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            file.name
-        )
-        targetFile.writeBytes(file.readBytes())
     }
     toast("已保存 ${file.name} 到下载")
 }
@@ -136,9 +127,4 @@ fun <T : Service> startForegroundServiceByClass(clazz: KClass<T>) {
 }
 
 val Intent.extraCptName: ComponentName?
-    get() = if (AndroidTarget.TIRAMISU) {
-        getParcelableExtra(Intent.EXTRA_COMPONENT_NAME, ComponentName::class.java)
-    } else {
-        @Suppress("DEPRECATION")
-        getParcelableExtra(Intent.EXTRA_COMPONENT_NAME) as? ComponentName?
-    }
+    get() = getParcelableExtra(Intent.EXTRA_COMPONENT_NAME, ComponentName::class.java)

@@ -8,7 +8,6 @@ import android.view.Display
 import li.songe.gkd.a11y.ActivityScene
 import li.songe.gkd.a11y.topActivityFlow
 import li.songe.gkd.a11y.updateTopActivity
-import li.songe.gkd.util.AndroidTarget
 
 object CompatTaskStackListener : ITaskStackListener.Stub() {
 
@@ -56,7 +55,7 @@ object CompatTaskStackListener : ITaskStackListener.Stub() {
     }
 
     override fun onTaskMovedToFront(taskInfo: ActivityManager.RunningTaskInfo) {
-        if (AndroidTarget.Q && taskInfo.toHidden.displayId != Display.DEFAULT_DISPLAY) {
+        if (taskInfo.toHidden.displayId != Display.DEFAULT_DISPLAY) {
             return
         }
         onTaskMovedToFrontCompat(taskInfo.topActivity)
