@@ -49,7 +49,8 @@ private val queryDispatcher = Executors.newSingleThreadExecutor().asCoroutineDis
 private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
 private const val FAST_EVENT_DELIVERY_TIMEOUT = 0L
-private const val IDLE_EVENT_DELIVERY_TIMEOUT = 100L
+private const val NORMAL_EVENT_DELIVERY_TIMEOUT = 100L
+private const val IDLE_EVENT_DELIVERY_TIMEOUT = 250L
 private const val ACTIVITY_FRESH_WINDOW = 3000L
 
 private val latestServiceMode = atomic(0)
@@ -135,6 +136,9 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         if (event.eventType == CONTENT_CHANGED) {
             if (!isInteractive) return // 屏幕关闭后仍然有无障碍事件 type:2048, time:8094, app:com.miui.aod, cls:android.widget.TextView
             if (event.packageName == systemUiAppId && event.packageName != topActivityFlow.value.appId) return
+            // 当前应用无可活跃规则时, 其内容变化事件无需进入匹配管线
+            // 活跃状态由 STATE_CHANGED 驱动, 不受此影响
+            if (event.packageName == topActivityFlow.value.appId && activityRuleFlow.value.skipConsumeEvent) return
         }
         // 过滤部分输入法事件
         if (event.packageName == imeAppId && topActivityFlow.value.appId != imeAppId) {
@@ -318,12 +322,13 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     private fun computeEventDeliveryTimeout(): Long {
         if (!storeFlow.value.enableMatch) return IDLE_EVENT_DELIVERY_TIMEOUT
         val activityRule = activityRuleFlow.value
-        if (activityRule.skipMatch || activityRule.currentRules.isEmpty()) return IDLE_EVENT_DELIVERY_TIMEOUT
+        if (activityRule.currentRules.isEmpty()) return IDLE_EVENT_DELIVERY_TIMEOUT
+        if (activityRule.skipMatch) return IDLE_EVENT_DELIVERY_TIMEOUT
         val freshLaunch = System.currentTimeMillis() - appChangeTime < ACTIVITY_FRESH_WINDOW
         return if (freshLaunch || activityRule.hasFeatureAction) {
             FAST_EVENT_DELIVERY_TIMEOUT
         } else {
-            IDLE_EVENT_DELIVERY_TIMEOUT
+            NORMAL_EVENT_DELIVERY_TIMEOUT
         }
     }
 
