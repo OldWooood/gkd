@@ -50,7 +50,7 @@ private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDi
 
 private const val FAST_EVENT_DELIVERY_TIMEOUT = 0L
 private const val IDLE_EVENT_DELIVERY_TIMEOUT = 250L
-private const val ACTIVITY_FRESH_WINDOW = 3000L
+private const val SPLASH_ACTIVE_WINDOW = 10_000L
 
 private val latestServiceMode = atomic(0)
 private val latestServiceTime = atomic(0L)
@@ -312,7 +312,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         eventDeliveryRestoreJob?.cancel()
         if (timeoutMillis == FAST_EVENT_DELIVERY_TIMEOUT) {
             eventDeliveryRestoreJob = scope.launch(actionDispatcher) {
-                delay(ACTIVITY_FRESH_WINDOW + 500L)
+                delay(SPLASH_ACTIVE_WINDOW + 500L)
                 applyEventDeliveryTimeout(computeEventDeliveryTimeout())
             }
         }
@@ -323,10 +323,9 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         val activityRule = activityRuleFlow.value
         if (activityRule.currentRules.isEmpty()) return IDLE_EVENT_DELIVERY_TIMEOUT
         if (activityRule.skipMatch) return IDLE_EVENT_DELIVERY_TIMEOUT
-        // 仅保留开屏规则后, 规则只在进应用后 matchTime 窗口内活跃,
-        // 活跃期全速投递, 其余时间进入低频档
-        val active = System.currentTimeMillis() - appChangeTime < ACTIVITY_FRESH_WINDOW ||
-                activityRule.hasFeatureAction
+        // 仅关注冷启动/应用切换后的开屏窗口,
+        // 应用内界面切换不会更新 appChangeTime, 不再重新武装全速档
+        val active = System.currentTimeMillis() - appChangeTime < SPLASH_ACTIVE_WINDOW
         return if (active) FAST_EVENT_DELIVERY_TIMEOUT else IDLE_EVENT_DELIVERY_TIMEOUT
     }
 
