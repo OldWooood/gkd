@@ -49,7 +49,6 @@ private val queryDispatcher = Executors.newSingleThreadExecutor().asCoroutineDis
 private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
 private const val FAST_EVENT_DELIVERY_TIMEOUT = 0L
-private const val NORMAL_EVENT_DELIVERY_TIMEOUT = 100L
 private const val IDLE_EVENT_DELIVERY_TIMEOUT = 250L
 private const val ACTIVITY_FRESH_WINDOW = 3000L
 
@@ -324,12 +323,11 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         val activityRule = activityRuleFlow.value
         if (activityRule.currentRules.isEmpty()) return IDLE_EVENT_DELIVERY_TIMEOUT
         if (activityRule.skipMatch) return IDLE_EVENT_DELIVERY_TIMEOUT
-        val freshLaunch = System.currentTimeMillis() - appChangeTime < ACTIVITY_FRESH_WINDOW
-        return if (freshLaunch || activityRule.hasFeatureAction) {
-            FAST_EVENT_DELIVERY_TIMEOUT
-        } else {
-            NORMAL_EVENT_DELIVERY_TIMEOUT
-        }
+        // 仅保留开屏规则后, 规则只在进应用后 matchTime 窗口内活跃,
+        // 活跃期全速投递, 其余时间进入低频档
+        val active = System.currentTimeMillis() - appChangeTime < ACTIVITY_FRESH_WINDOW ||
+                activityRule.hasFeatureAction
+        return if (active) FAST_EVENT_DELIVERY_TIMEOUT else IDLE_EVENT_DELIVERY_TIMEOUT
     }
 
     private fun applyEventDeliveryTimeout(timeoutMillis: Long) {

@@ -18,6 +18,8 @@ import li.songe.gkd.data.SubsItem
 import li.songe.gkd.db.DbSet
 import java.net.URI
 
+private const val SPLASH_GROUP_NAME_PREFIX = "开屏广告"
+
 val subsItemsFlow by lazy {
     DbSet.subsItemDao.query().stateIn(appScope, SharingStarted.Eagerly, emptyList())
 }
@@ -235,8 +237,10 @@ val ruleSummaryFlow by lazy {
             val subGlobalGroupToRules =
                 mutableMapOf<RawSubscription.RawGlobalGroup, List<GlobalRule>>()
             rawSubs.globalGroups.filter { g ->
-                (subGlobalSubsConfigs.find { c -> c.groupKey == g.key }?.enable
-                    ?: g.enable ?: true) && g.valid
+                // fork 仅保留开屏广告规则
+                g.name.startsWith(SPLASH_GROUP_NAME_PREFIX) &&
+                        (subGlobalSubsConfigs.find { c -> c.groupKey == g.key }?.enable
+                            ?: g.enable ?: true) && g.valid
             }.forEach { groupRaw ->
                 val config = subGlobalSubsConfigs.find { c -> c.groupKey == groupRaw.key }
                 val g = ResolvedGlobalGroup(
@@ -297,7 +301,8 @@ val ruleSummaryFlow by lazy {
                 }
                 appAllGroups[appRaw.id] = (appAllGroups[appRaw.id] ?: emptyList()) + groupAndEnables
                 groupAndEnables.forEach { g ->
-                    if (g.enable) {
+                    // fork 仅保留开屏广告规则
+                    if (g.enable && g.group.name.startsWith(SPLASH_GROUP_NAME_PREFIX)) {
                         subAppGroups.add(g.group)
                         val subRules = g.group.rules.map { ruleRaw ->
                             AppRule(
