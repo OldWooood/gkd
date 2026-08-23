@@ -49,8 +49,16 @@ private val queryDispatcher = Executors.newSingleThreadExecutor().asCoroutineDis
 private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
 private const val FAST_EVENT_DELIVERY_TIMEOUT = 0L
-private const val IDLE_EVENT_DELIVERY_TIMEOUT = 250L
+private const val IDLE_EVENT_DELIVERY_TIMEOUT = 500L
+private const val PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT = 1000L
 private const val SPLASH_ACTIVE_WINDOW = 5_000L
+
+private val idleEventDeliveryTimeout: Long
+    get() = if (privilegeContextFlow.value != null) {
+        PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT
+    } else {
+        IDLE_EVENT_DELIVERY_TIMEOUT
+    }
 
 private val latestServiceMode = atomic(0)
 private val latestServiceTime = atomic(0L)
@@ -311,22 +319,24 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         applyEventDeliveryTimeout(timeoutMillis)
         eventDeliveryRestoreJob?.cancel()
         if (timeoutMillis == FAST_EVENT_DELIVERY_TIMEOUT) {
+            // delay 锚定 appChangeTime, 避免窗口内重复 refresh 导致降档时刻不断后移
+            val remain = appChangeTime + SPLASH_ACTIVE_WINDOW - System.currentTimeMillis()
             eventDeliveryRestoreJob = scope.launch(actionDispatcher) {
-                delay(SPLASH_ACTIVE_WINDOW + 500L)
+                delay(remain + 500L)
                 applyEventDeliveryTimeout(computeEventDeliveryTimeout())
             }
         }
     }
 
     private fun computeEventDeliveryTimeout(): Long {
-        if (!storeFlow.value.enableMatch) return IDLE_EVENT_DELIVERY_TIMEOUT
+        if (!storeFlow.value.enableMatch) return idleEventDeliveryTimeout
         val activityRule = activityRuleFlow.value
-        if (activityRule.currentRules.isEmpty()) return IDLE_EVENT_DELIVERY_TIMEOUT
-        if (activityRule.skipMatch) return IDLE_EVENT_DELIVERY_TIMEOUT
+        if (activityRule.currentRules.isEmpty()) return idleEventDeliveryTimeout
+        if (activityRule.skipMatch) return idleEventDeliveryTimeout
         // 仅关注冷启动/应用切换后的开屏窗口,
         // 应用内界面切换不会更新 appChangeTime, 不再重新武装全速档
         val active = System.currentTimeMillis() - appChangeTime < SPLASH_ACTIVE_WINDOW
-        return if (active) FAST_EVENT_DELIVERY_TIMEOUT else IDLE_EVENT_DELIVERY_TIMEOUT
+        return if (active) FAST_EVENT_DELIVERY_TIMEOUT else idleEventDeliveryTimeout
     }
 
     private fun applyEventDeliveryTimeout(timeoutMillis: Long) {
