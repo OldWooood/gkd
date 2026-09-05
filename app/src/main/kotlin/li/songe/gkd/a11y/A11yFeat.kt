@@ -21,14 +21,10 @@ import li.songe.gkd.util.SubscriptionStore
 import li.songe.gkd.util.UpdateTimeOption
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.mapState
-import li.songe.selector.MatchOption
-import li.songe.selector.QueryContext
+import li.songe.selector.MatchOptions
 import li.songe.selector.Selector
-import li.songe.selector.Transform
-import li.songe.selector.getBooleanInvoke
-import li.songe.selector.getCharSequenceAttr
-import li.songe.selector.getCharSequenceInvoke
-import li.songe.selector.getIntInvoke
+import li.songe.selector.SelectorCompileResult
+import li.songe.selector.NodeAdapter
 
 
 fun onA11yFeatEvent(event: AccessibilityEvent) = event.run {
@@ -48,60 +44,50 @@ private fun AccessibilityEvent.getEventAttr(name: String): Any? = when (name) {
     else -> null
 }
 
-private val a11yEventTransform by lazy {
-    Transform<AccessibilityEvent>(
-        getAttr = { target, name ->
-            when (target) {
-                is QueryContext<*> -> when (name) {
-                    "prev" -> target.prev
-                    "current" -> target.current
-                    else -> (target.current as AccessibilityEvent).getEventAttr(name)
-                }
+private object A11yEventNodeAdapter : NodeAdapter<AccessibilityEvent>() {
+    override fun getAttr(target: Any, name: String): Any? = when (target) {
+        is AccessibilityEvent -> target.getEventAttr(name)
+        is List<*> -> when (name) {
+            "size" -> target.size
+            else -> null
+        }
 
-                is CharSequence -> getCharSequenceAttr(target, name)
-                is AccessibilityEvent -> target.getEventAttr(name)
-                is List<*> -> when (name) {
-                    "size" -> target.size
-                    else -> null
-                }
+        else -> null
+    }
 
-                else -> null
-            }
-        },
-        getInvoke = { target, name, args ->
-            when (target) {
-                is Int -> getIntInvoke(target, name, args)
-                is Boolean -> getBooleanInvoke(target, name, args)
-                is CharSequence -> getCharSequenceInvoke(target, name, args)
-                is List<*> -> when (name) {
-                    "get" -> {
-                        (args.singleOrNull() as? Int)?.let { index ->
-                            target.getOrNull(index)
-                        }
-                    }
+    override fun getInvoke(target: Any, name: String, args: List<Any>): Any? = when (target) {
+        is List<*> -> when (name) {
+            "get" -> (args.singleOrNull() as? Int)?.let(target::getOrNull)
+            else -> null
+        }
 
-                    else -> null
-                }
+        else -> null
+    }
 
-                else -> null
-            }
-        },
-        getName = { it.className },
-        getChildren = { emptySequence() },
-        getParent = { null }
-    )
+    override fun getName(node: AccessibilityEvent): String? = node.className?.toString()
+
+    override fun getChildCount(node: AccessibilityEvent): Int = 0
+
+    override fun getChild(node: AccessibilityEvent, index: Int): AccessibilityEvent? = null
+
+    override fun getParent(node: AccessibilityEvent): AccessibilityEvent? = null
+
+    override fun getNodeKey(node: AccessibilityEvent): Any = node
 }
+
+private val a11yEventAdapter = A11yEventNodeAdapter
 
 context(event: AccessibilityEvent)
 private fun watchCaptureScreenshot() {
     if (!storeFlow.value.captureScreenshot) return
     if (event.packageName != storeFlow.value.screenshotTargetAppId) return
     if (tempEventSelector.first != storeFlow.value.screenshotEventSelector) {
-        tempEventSelector =
-            storeFlow.value.screenshotEventSelector to Selector.parseOrNull(storeFlow.value.screenshotEventSelector)
+        val result = Selector.compile(storeFlow.value.screenshotEventSelector)
+        tempEventSelector = storeFlow.value.screenshotEventSelector to
+            (result as? SelectorCompileResult.Success)?.value
     }
     val selector = tempEventSelector.second ?: return
-    selector.match(event, a11yEventTransform, MatchOption(fastQuery = false)).let {
+    selector.match(event, a11yEventAdapter, MatchOptions(fastQuery = false)).let {
         if (it == null) return
     }
     appScope.launchTry {

@@ -17,6 +17,8 @@ kotlin {
     sourceSets {
         all {
             languageSettings.optIn("kotlin.js.ExperimentalJsExport")
+            languageSettings.optIn("kotlin.js.ExperimentalJsStatic")
+            languageSettings.optIn("kotlin.js.ExperimentalJsCollectionsApi")
         }
         commonMain {
             dependencies {

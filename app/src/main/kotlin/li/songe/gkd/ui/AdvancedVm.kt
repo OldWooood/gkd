@@ -8,6 +8,7 @@ import li.songe.gkd.ui.share.BaseViewModel
 import li.songe.gkd.util.appInfoMapFlow
 import li.songe.gkd.util.toast
 import li.songe.selector.Selector
+import li.songe.selector.SelectorCompileResult
 
 class AdvancedVm : BaseViewModel() {
 
@@ -59,7 +60,10 @@ class AdvancedVm : BaseViewModel() {
             toast("无效应用ID")
             return false
         }
-        if (eventSelector.isNotEmpty() && Selector.parseOrNull(eventSelector) == null) {
+        if (
+            eventSelector.isNotEmpty() &&
+            Selector.compile(eventSelector) is SelectorCompileResult.Failure
+        ) {
             toast("无效事件选择器")
             return false
         }

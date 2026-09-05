@@ -5,7 +5,6 @@ import li.songe.gkd.META
 import li.songe.gkd.R
 import li.songe.gkd.service.ActivityService
 import li.songe.gkd.service.ButtonService
-import li.songe.gkd.service.EventService
 import li.songe.gkd.service.HttpService
 import li.songe.gkd.service.ScreenshotService
 import li.songe.gkd.service.TrackService
@@ -21,7 +20,6 @@ enum class ForegroundNotificationKey(
     Http(id = 103),
     Expose(id = 104),
     Activity(id = 106),
-    Event(id = 107),
     Track(id = 108),
 }
 
@@ -137,13 +135,6 @@ object NotificationCatalog {
         text = text,
         uri = "gkd://page/1",
         stopService = ActivityService::class,
-    )
-
-    fun event() = ForegroundNotification(
-        key = ForegroundNotificationKey.Event,
-        title = "事件服务正在运行",
-        uri = "gkd://page/1",
-        stopService = EventService::class,
     )
 
     fun track() = ForegroundNotification(

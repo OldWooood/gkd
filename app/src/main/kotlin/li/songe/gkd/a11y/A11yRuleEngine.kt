@@ -27,7 +27,7 @@ import li.songe.gkd.data.RpcError
 import li.songe.gkd.data.RuleStatus
 import li.songe.gkd.isActivityVisible
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.service.EventService
+import li.songe.gkd.service.EventLogStore
 import li.songe.gkd.service.topAppIdFlow
 import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.priv.uiAutomationFlow
@@ -38,8 +38,10 @@ import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.runMainPost
 import li.songe.gkd.util.showActionToast
 import li.songe.gkd.util.systemUiAppId
-import li.songe.selector.MatchOption
+import li.songe.selector.MatchOptions
 import li.songe.selector.Selector
+import li.songe.selector.SelectorCompileResult
+import li.songe.selector.SelectorTypeResult
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -162,7 +164,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             }
             lastContentEventTime = a11yEvent.time
         }
-        EventService.logEvent(event)
+        EventLogStore.logEvent(event)
         if (META.debuggable) {
             Log.d(
                 "onNewA11yEvent",
@@ -533,14 +535,17 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         suspend fun screenshot(): Bitmap? = service?.screenshot()
 
         suspend fun execAction(gkdAction: GkdAction): ActionResult {
-            val selector = Selector.parseOrNull(gkdAction.selector) ?: throw RpcError("非法选择器")
-            runCatching { selector.checkType(typeInfo) }.exceptionOrNull()?.let {
-                throw RpcError("选择器类型错误:${it.message}")
+            val selectorResult = Selector.compile(gkdAction.selector)
+            val selector = (selectorResult as? SelectorCompileResult.Success)?.value
+                ?: throw RpcError("非法选择器")
+            val typeResult = selector.validateType(selectorTypeModel)
+            if (typeResult is SelectorTypeResult.Failure) {
+                throw RpcError("选择器类型错误:${typeResult.error.message}")
             }
             val s = instance ?: throw RpcError("服务未连接")
             val a = s.safeActiveWindow ?: throw RpcError("界面没有节点信息")
             val targetNode = A11yContext(s, interruptable = false).querySelfOrSelector(
-                a, selector, MatchOption(fastQuery = gkdAction.fastQuery)
+                a, selector, MatchOptions(fastQuery = gkdAction.fastQuery)
             ) ?: throw RpcError("没有查询到节点")
             return withContext(Dispatchers.IO) {
                 ActionPerformer

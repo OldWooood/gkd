@@ -46,7 +46,6 @@ import li.songe.gkd.R
 import li.songe.gkd.app
 import li.songe.gkd.service.ActivityService
 import li.songe.gkd.service.ButtonService
-import li.songe.gkd.service.EventService
 import li.songe.gkd.service.HttpService
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.component.CustomOutlinedTextField
@@ -90,7 +89,6 @@ private fun AdvancedContent() {
     val localNetworkIps by HttpService.localNetworkIpsFlow.collectAsStateWithLifecycle()
     val buttonServiceRunning by ButtonService.isRunning.collectAsStateWithLifecycle()
     val activityServiceRunning by ActivityService.isRunning.collectAsStateWithLifecycle()
-    val eventServiceRunning by EventService.isRunning.collectAsStateWithLifecycle()
 
     if (showHttpSettingsDialog) {
         SettingsDialog(
@@ -316,14 +314,6 @@ private fun AdvancedContent() {
                 title = "事件日志",
                 subtitle = "无障碍事件日志",
                 onClick = { mainVm.navigatePage(A11yEventLogRoute) },
-            )
-            TextSwitch(
-                title = "事件服务",
-                subtitle = "显示无障碍事件",
-                checked = eventServiceRunning,
-                onCheckedChange = scope.launchAsFn { enabled ->
-                    EventService.setEnabled(mainVm, enabled)
-                },
             )
             Spacer(modifier = Modifier.height(EmptyHeight))
         }

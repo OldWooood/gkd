@@ -1,6 +1,7 @@
 package li.songe.gkd.a11y
 
 import android.util.Log
+import android.util.LruCache
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.atomicfu.atomic
 import li.songe.gkd.META
@@ -8,15 +9,16 @@ import li.songe.gkd.data.ResolvedRule
 import li.songe.gkd.priv.toHidden
 import li.songe.gkd.util.InterruptRuleMatchException
 import li.songe.selector.FastQuery
-import li.songe.selector.MatchOption
-import li.songe.selector.QueryContext
+import li.songe.selector.MatchOptions
 import li.songe.selector.Selector
-import li.songe.selector.Transform
-import li.songe.selector.getBooleanInvoke
-import li.songe.selector.getCharSequenceAttr
-import li.songe.selector.getCharSequenceInvoke
-import li.songe.selector.getIntInvoke
+import li.songe.selector.NodeAdapter
+import li.songe.selector.TraversalCandidate
+import li.songe.selector.relation.RelationExpression
 
+
+private operator fun <K, V> LruCache<K, V>.set(child: K, value: V): V {
+    return put(child, value)
+}
 
 private fun List<Any>.getInt(i: Int = 0) = get(i) as Int
 
@@ -37,33 +39,21 @@ class A11yContext(
     private val a11yEngine: A11yRuleEngine,
     private val interruptable: Boolean = true,
 ) {
-    private var childrenCache = HashMap<AccessibilityNodeInfo, Array<AccessibilityNodeInfo?>>(
-        MAX_CACHE_SIZE
-    )
-    private var indexCache = HashMap<AccessibilityNodeInfo, Int>(MAX_CACHE_SIZE)
-    private var parentCache = HashMap<AccessibilityNodeInfo, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
+    private var childCache =
+        LruCache<Pair<AccessibilityNodeInfo, Int>, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
+    private var indexCache = LruCache<AccessibilityNodeInfo, Int>(MAX_CACHE_SIZE)
+    private var parentCache = LruCache<AccessibilityNodeInfo, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
     val rootCache = atomic<AccessibilityNodeInfo?>(null)
 
-    private fun <K, V> putBounded(map: HashMap<K, V>, key: K, value: V) {
-        if (map.size >= MAX_CACHE_SIZE) {
-            map.clear()
-        }
-        map[key] = value
-    }
-
-    private fun getChildrenArray(node: AccessibilityNodeInfo): Array<AccessibilityNodeInfo?> {
-        return childrenCache[node] ?: run {
-            val array = arrayOfNulls<AccessibilityNodeInfo>(
-                node.childCount.coerceAtMost(MAX_CHILD_SIZE)
-            )
-            putBounded(childrenCache, node, array)
-            array
-        }
-    }
-
-    private fun clearChildCache(node: AccessibilityNodeInfo) {
-        childrenCache.remove(node)?.forEach { child ->
-            child?.let { clearChildCache(it) }
+    private fun clearChildCache(
+        node: AccessibilityNodeInfo,
+        visitedNodes: MutableSet<AccessibilityNodeInfo> = mutableSetOf(),
+    ) {
+        if (!visitedNodes.add(node)) return
+        repeat(node.childCount.coerceAtMost(MAX_CHILD_SIZE)) { i ->
+            childCache.remove(node to i)?.let {
+                clearChildCache(it, visitedNodes)
+            }
         }
     }
 
@@ -75,10 +65,7 @@ class A11yContext(
             clearChildCache(eventNode)
             parentCache[eventNode]?.let { p ->
                 getPureIndex(eventNode)?.let { i ->
-                    val array = childrenCache[p]
-                    if (array != null && i < array.size) {
-                        array[i] = eventNode
-                    }
+                    childCache[p to i] = eventNode
                 }
             }
             if (rootCache.value == eventNode) {
@@ -94,22 +81,21 @@ class A11yContext(
             }
         }
         if (META.debuggable) {
-            val sizeList = listOf(childrenCache.size, parentCache.size, indexCache.size)
+            val sizeList = listOf(childCache.size(), parentCache.size(), indexCache.size())
             if (sizeList.any { it > 0 }) {
                 Log.d("cache", "clear cache -> $sizeList")
             }
         }
         try {
-            childrenCache.clear()
-            parentCache.clear()
-            indexCache.clear()
-            clearNodeTimeCache()
+            childCache.evictAll()
+            parentCache.evictAll()
+            indexCache.evictAll()
         } catch (_: Exception) {
             // https://github.com/gkd-kit/gkd/issues/664
             // 在某些机型上 未知原因 缓存不一致 导致删除失败
-            childrenCache = HashMap(MAX_CACHE_SIZE)
-            indexCache = HashMap(MAX_CACHE_SIZE)
-            parentCache = HashMap(MAX_CACHE_SIZE)
+            childCache = LruCache(MAX_CACHE_SIZE)
+            indexCache = LruCache(MAX_CACHE_SIZE)
+            parentCache = LruCache(MAX_CACHE_SIZE)
         }
     }
 
@@ -204,7 +190,7 @@ class A11yContext(
         parentCache[node].notExpiredNode?.let { return it }
         return getA11Parent(node).apply {
             if (this != null) {
-                putBounded(parentCache, node, this)
+                parentCache[node] = this
             } else {
                 rootCache.value = node
             }
@@ -215,17 +201,10 @@ class A11yContext(
         if (index !in 0 until node.childCount) {
             return null
         }
-        val array = getChildrenArray(node)
-        val cached = array.getOrNull(index)
-        if (cached != null && cached.notExpiredNode != null) {
-            return cached
-        }
-        return getA11Child(node, index)?.also { child ->
-            putBounded(indexCache, child, index)
-            putBounded(parentCache, child, node)
-            if (index < array.size) {
-                array[index] = child
-            }
+        return childCache[node to index].notExpiredNode ?: getA11Child(node, index)?.also { child ->
+            indexCache[child] = index
+            parentCache[child] = node
+            childCache[node to index] = child
         }
     }
 
@@ -244,24 +223,16 @@ class A11yContext(
         return 0
     }
 
-    /**
-     * 在无缓存时, 此方法小概率造成无限节点片段,底层原因未知
-     *
-     * https://github.com/gkd-kit/gkd/issues/28
-     */
-    private fun getCacheDepth(node: AccessibilityNodeInfo): Int {
+    /** Broken accessibility parent chains may contain cycles; see issue #28. */
+    private fun getCacheDepth(node: AccessibilityNodeInfo): Int? {
+        val visitedNodes = mutableSetOf<AccessibilityNodeInfo>()
         var p: AccessibilityNodeInfo = node
         var depth = 0
-        while (true) {
-            val p2 = getCacheParent(p)
-            if (p2 != null) {
-                p = p2
-                depth++
-            } else {
-                break
-            }
+        while (visitedNodes.add(p)) {
+            p = getCacheParent(p) ?: return depth
+            depth++
         }
-        return depth
+        return null
     }
 
     private fun getCacheChildren(node: AccessibilityNodeInfo?): Sequence<AccessibilityNodeInfo> {
@@ -318,61 +289,45 @@ class A11yContext(
         else -> null
     }
 
-    private val transform = Transform(
-        getAttr = { target, name ->
-            when (target) {
-                is QueryContext<*> -> when (name) {
-                    "prev" -> target.prev
-                    "current" -> target.current
-                    else -> getCacheAttr(target.current as AccessibilityNodeInfo, name)
-                }
+    private inner class A11yNodeAdapter : NodeAdapter<AccessibilityNodeInfo>() {
+        override fun getAttr(target: Any, name: String): Any? = when (target) {
+            is AccessibilityNodeInfo -> getCacheAttr(target, name)
+            else -> null
+        }
 
-                is AccessibilityNodeInfo -> getCacheAttr(target, name)
-                is CharSequence -> getCharSequenceAttr(target, name)
+        override fun getInvoke(target: Any, name: String, args: List<Any>): Any? = when (target) {
+            is AccessibilityNodeInfo -> when (name) {
+                "getChild" -> getCacheChild(target, args.getInt())
                 else -> null
             }
-        },
-        getInvoke = { target, name, args ->
-            when (target) {
-                is AccessibilityNodeInfo -> when (name) {
-                    "getChild" -> {
-                        getCacheChild(target, args.getInt())
-                    }
+            else -> null
+        }
 
-                    else -> null
-                }
+        override fun getName(node: AccessibilityNodeInfo): String? = node.className?.toString()
 
-                is QueryContext<*> -> when (name) {
-                    "getPrev" -> {
-                        args.getInt().let { target.getPrev(it) }
-                    }
+        override fun getChildCount(node: AccessibilityNodeInfo): Int =
+            node.childCount.coerceAtMost(MAX_CHILD_SIZE)
 
-                    "getChild" -> {
-                        getCacheChild(target.current as AccessibilityNodeInfo, args.getInt())
-                    }
+        override fun getChild(node: AccessibilityNodeInfo, index: Int): AccessibilityNodeInfo? =
+            getCacheChild(node, index)
 
-                    else -> null
-                }
+        override fun getParent(node: AccessibilityNodeInfo): AccessibilityNodeInfo? =
+            getCacheParent(node)
 
-                is CharSequence -> getCharSequenceInvoke(target, name, args)
-                is Int -> getIntInvoke(target, name, args)
-                is Boolean -> getBooleanInvoke(target, name, args)
+        override fun getNodeKey(node: AccessibilityNodeInfo): Any = node
 
-                else -> null
-            }
-        },
-        getName = { node -> node.className },
-        getChildren = ::getCacheChildren,
-        getParent = ::getCacheParent,
-        getRoot = ::getCacheRoot,
-        getDescendants = { node ->
+        override fun getRoot(node: AccessibilityNodeInfo): AccessibilityNodeInfo? = getCacheRoot()
+
+        override fun getDescendants(node: AccessibilityNodeInfo): Sequence<AccessibilityNodeInfo> =
             sequence {
+                val visitedNodes = mutableSetOf(node)
                 val stack = getCacheChildren(node).toMutableList()
                 if (stack.isEmpty()) return@sequence
                 stack.reverse()
                 val tempNodes = mutableListOf<AccessibilityNodeInfo>()
                 do {
                     val top = stack.removeAt(stack.lastIndex)
+                    if (!visitedNodes.add(top)) continue
                     yield(top)
                     for (childNode in getCacheChildren(top)) {
                         tempNodes.add(childNode)
@@ -385,149 +340,169 @@ class A11yContext(
                     }
                 } while (stack.isNotEmpty())
             }.take(MAX_DESCENDANTS_SIZE)
-        },
-        traverseChildren = { node, connectExpression ->
-            sequence {
-                repeat(node.childCount.coerceAtMost(MAX_CHILD_SIZE)) { offset ->
-                    connectExpression.maxOffset?.let { maxOffset ->
+
+        override fun traverseChildren(
+            node: AccessibilityNodeInfo,
+            relationExpression: RelationExpression,
+        ): Sequence<TraversalCandidate<AccessibilityNodeInfo>> = sequence {
+            repeat(node.childCount.coerceAtMost(MAX_CHILD_SIZE)) { offset ->
+                relationExpression.maxOffset?.let { maxOffset ->
+                    if (offset > maxOffset) return@sequence
+                }
+                if (relationExpression.checkOffset(offset)) {
+                    getCacheChild(node, offset)?.let { child ->
+                        yield(TraversalCandidate(child, offset))
+                    }
+                }
+            }
+        }
+
+        override fun traversePreviousSiblings(
+            node: AccessibilityNodeInfo,
+            relationExpression: RelationExpression,
+        ): Sequence<TraversalCandidate<AccessibilityNodeInfo>> = sequence {
+            val parentVal = getCacheParent(node) ?: return@sequence
+            // 如果 node 由 fastQuery 得到, 则第一次调用此方法可能得到 cache.index 是空
+            val index = getPureIndex(node)
+            if (index != null) {
+                var i = index - 1
+                var offset = 0
+                while (0 <= i && i < parentVal.childCount) {
+                    relationExpression.maxOffset?.let { maxOffset ->
                         if (offset > maxOffset) return@sequence
                     }
-                    if (connectExpression.checkOffset(offset)) {
-                        val child = getCacheChild(node, offset) ?: return@sequence
-                        yield(child)
+                    if (relationExpression.checkOffset(offset)) {
+                        getCacheChild(parentVal, i)?.let { child ->
+                            yield(TraversalCandidate(child, offset))
+                        }
+                    }
+                    i--
+                    offset++
+                }
+            } else {
+                val list = getCacheChildren(parentVal).takeWhile { it != node }.toMutableList()
+                list.reverse()
+                for ((offset, sibling) in list.withIndex()) {
+                    if (relationExpression.maxOffset?.let { offset > it } == true) break
+                    if (relationExpression.checkOffset(offset)) {
+                        yield(TraversalCandidate(sibling, offset))
                     }
                 }
             }
-        },
-        traverseBeforeBrothers = { node, connectExpression ->
-            sequence {
-                val parentVal = getCacheParent(node) ?: return@sequence
-                // 如果 node 由 fastQuery 得到, 则第一次调用此方法可能得到 cache.index 是空
-                val index = getPureIndex(node)
-                if (index != null) {
-                    var i = index - 1
-                    var offset = 0
-                    while (0 <= i && i < parentVal.childCount) {
-                        connectExpression.maxOffset?.let { maxOffset ->
-                            if (offset > maxOffset) return@sequence
-                        }
-                        if (connectExpression.checkOffset(offset)) {
-                            val child = getCacheChild(parentVal, i) ?: return@sequence
-                            yield(child)
-                        }
-                        i--
-                        offset++
-                    }
-                } else {
-                    val list = getCacheChildren(parentVal).takeWhile { it != node }.toMutableList()
-                    list.reverse()
-                    yieldAll(list.filterIndexed { i, _ ->
-                        connectExpression.checkOffset(
-                            i
-                        )
-                    })
-                }
-            }
-        },
-        traverseAfterBrothers = { node, connectExpression ->
+        }
+
+        override fun traverseFollowingSiblings(
+            node: AccessibilityNodeInfo,
+            relationExpression: RelationExpression,
+        ): Sequence<TraversalCandidate<AccessibilityNodeInfo>> {
             val parentVal = getCacheParent(node)
-            if (parentVal != null) {
+            return if (parentVal != null) {
                 val index = getPureIndex(node)
                 if (index != null) {
                     sequence {
                         var i = index + 1
                         var offset = 0
                         while (0 <= i && i < parentVal.childCount) {
-                            connectExpression.maxOffset?.let { maxOffset ->
+                            relationExpression.maxOffset?.let { maxOffset ->
                                 if (offset > maxOffset) return@sequence
                             }
-                            if (connectExpression.checkOffset(offset)) {
-                                val child = getCacheChild(parentVal, i) ?: return@sequence
-                                yield(child)
+                            if (relationExpression.checkOffset(offset)) {
+                                getCacheChild(parentVal, i)?.let { child ->
+                                    yield(TraversalCandidate(child, offset))
+                                }
                             }
                             i++
                             offset++
                         }
                     }
                 } else {
-                    getCacheChildren(parentVal).dropWhile { it != node }
-                        .drop(1)
-                        .let {
-                            if (connectExpression.maxOffset != null) {
-                                it.take(connectExpression.maxOffset!! + 1)
-                            } else {
-                                it
+                    sequence {
+                        getCacheChildren(parentVal)
+                            .dropWhile { it != node }
+                            .drop(1)
+                            .forEachIndexed { offset, sibling ->
+                                if (relationExpression.maxOffset?.let { offset > it } == true) {
+                                    return@sequence
+                                }
+                                if (relationExpression.checkOffset(offset)) {
+                                    yield(TraversalCandidate(sibling, offset))
+                                }
                             }
-                        }
-                        .filterIndexed { i, _ ->
-                            connectExpression.checkOffset(
-                                i
-                            )
-                        }
+                    }
                 }
             } else {
                 emptySequence()
             }
-        },
-        traverseDescendants = { node, connectExpression ->
-            sequence {
-                val stack = getCacheChildren(node).toMutableList()
-                if (stack.isEmpty()) return@sequence
-                stack.reverse()
-                val tempNodes = mutableListOf<AccessibilityNodeInfo>()
-                var offset = 0
-                do {
-                    val top = stack.removeAt(stack.lastIndex)
-                    if (connectExpression.checkOffset(offset)) {
-                        yield(top)
+        }
+
+        override fun traverseDescendants(
+            node: AccessibilityNodeInfo,
+            relationExpression: RelationExpression,
+        ): Sequence<TraversalCandidate<AccessibilityNodeInfo>> = sequence {
+            val visitedNodes = mutableSetOf(node)
+            val stack = getCacheChildren(node).toMutableList()
+            if (stack.isEmpty()) return@sequence
+            stack.reverse()
+            val tempNodes = mutableListOf<AccessibilityNodeInfo>()
+            var offset = 0
+            do {
+                val top = stack.removeAt(stack.lastIndex)
+                if (!visitedNodes.add(top)) continue
+                if (relationExpression.checkOffset(offset)) {
+                    yield(TraversalCandidate(top, offset))
+                }
+                offset++
+                if (offset > MAX_DESCENDANTS_SIZE) {
+                    return@sequence
+                }
+                relationExpression.maxOffset?.let { maxOffset ->
+                    if (offset > maxOffset) return@sequence
+                }
+                for (childNode in getCacheChildren(top)) {
+                    tempNodes.add(childNode)
+                }
+                if (tempNodes.isNotEmpty()) {
+                    for (i in tempNodes.size - 1 downTo 0) {
+                        stack.add(tempNodes[i])
                     }
-                    offset++
-                    if (offset > MAX_DESCENDANTS_SIZE) {
-                        return@sequence
-                    }
-                    connectExpression.maxOffset?.let { maxOffset ->
-                        if (offset > maxOffset) return@sequence
-                    }
-                    for (childNode in getCacheChildren(top)) {
-                        tempNodes.add(childNode)
-                    }
-                    if (tempNodes.isNotEmpty()) {
-                        for (i in tempNodes.size - 1 downTo 0) {
-                            stack.add(tempNodes[i])
-                        }
-                        tempNodes.clear()
-                    }
-                } while (stack.isNotEmpty())
-            }
-        },
-        traverseFastQueryDescendants = { node, list ->
-            sequence {
-                for (fastQuery in list) {
-                    val nodes = getFastQueryNodes(node, fastQuery)
-                    nodes.forEach { childNode ->
+                    tempNodes.clear()
+                }
+            } while (stack.isNotEmpty())
+        }
+
+        override fun getFastQueryDescendants(
+            node: AccessibilityNodeInfo,
+            fastQueryList: List<FastQuery>,
+        ): Sequence<AccessibilityNodeInfo> = sequence {
+            val yieldedKeys = mutableSetOf(getNodeKey(node))
+            for (fastQuery in fastQueryList) {
+                for (childNode in getFastQueryNodes(node, fastQuery)) {
+                    if (yieldedKeys.add(getNodeKey(childNode))) {
                         yield(childNode)
                     }
                 }
             }
         }
-    )
+    }
+
+    private val adapter = A11yNodeAdapter()
 
     fun querySelfOrSelector(
         node: AccessibilityNodeInfo,
         selector: Selector,
-        option: MatchOption,
+        options: MatchOptions,
     ): AccessibilityNodeInfo? {
         if (selector.isMatchRoot) {
             return selector.match(
                 getCacheRoot() ?: return null,
-                transform,
-                option
+                adapter,
+                options
             )
         }
-        selector.match(node, transform, option)?.let {
+        selector.match(node, adapter, options)?.let {
             return it
         }
-        return transform.querySelector(node, selector, option)
+        return adapter.querySelector(node, selector, options)
     }
 
     fun queryRule(
@@ -547,7 +522,7 @@ class A11yContext(
                     resultNode = querySelfOrSelector(
                         queryNode,
                         selector,
-                        rule.matchOption,
+                        rule.matchOptions,
                     )
                     if (resultNode != null) break
                 }
@@ -557,14 +532,14 @@ class A11yContext(
                 resultNode = querySelfOrSelector(
                     queryNode,
                     selector,
-                    rule.matchOption,
+                    rule.matchOptions,
                 ) ?: return null
             }
             for (selector in rule.excludeMatches) {
                 querySelfOrSelector(
                     queryNode,
                     selector,
-                    rule.matchOption,
+                    rule.matchOptions,
                 )?.let { return null }
             }
             if (rule.excludeAllMatches.isNotEmpty()) {
@@ -572,7 +547,7 @@ class A11yContext(
                     querySelfOrSelector(
                         queryNode,
                         it,
-                        rule.matchOption,
+                        rule.matchOptions,
                     ) == null
                 }
                 if (!allExclude) {

@@ -11,7 +11,7 @@ import li.songe.gkd.contentObserver
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.util.OnSimpleLife
 import li.songe.gkd.util.mapState
-import li.songe.selector.initDefaultTypeInfo
+import li.songe.selector.createDefaultSelectorTypeModel
 import kotlin.contracts.contract
 import java.util.concurrent.ConcurrentHashMap
 
@@ -91,7 +91,7 @@ fun AccessibilityNodeInfo.isExpired(expiryMillis: Long): Boolean {
     return (System.currentTimeMillis() - generatedTime) > expiryMillis
 }
 
-val typeInfo by lazy { initDefaultTypeInfo().globalType }
+val selectorTypeModel by lazy { createDefaultSelectorTypeModel() }
 
 val AccessibilityNodeInfo.compatChecked: Boolean?
     get() = when (checked) {
