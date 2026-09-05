@@ -25,14 +25,16 @@
 本 fork 是 [gkd-kit/gkd](https://github.com/gkd-kit/gkd) 的个人定制版，只关注一件事：**跳过开屏广告**
 
 - **仅保留开屏广告规则**：订阅解析阶段即丢弃其他类别的规则（更新提示、全屏广告、青少年模式等均不参与匹配），订阅浏览界面同步只显示开屏广告分组
-- **仅支持 Android 16+**：minSdk 26 → 36，移除全部旧版本适配分支
+- **仅支持 Android 16+**：minSdk 26 → 36（API 36），移除全部旧版本适配分支；Android 15 及以下设备无法安装，请使用官方原版
 - **按开屏周期自适应事件投递**：仅冷启动/切换应用后的 5 秒开屏窗口内 0ms 全速投递，其余时间（含应用内界面切换）250ms 低频档 + 无规则应用内容事件入口丢弃，降低待机功耗
 - **应用内更新指向本仓库**：通过 `releases/latest/download/update.json` 检查更新，与官方源完全隔离
 - **本地签名配置**：支持仓库根目录未跟踪的 `key.properties`（兼容 `storeFile/storePassword/keyAlias/keyPassword` 键名）
 
 ## 安装
 
-从 [本仓库 Releases](https://github.com/OldWooood/gkd/releases/latest) 下载 APK
+从 [本仓库 Releases](https://github.com/OldWooood/gkd/releases/latest) 下载 APK（文件名 `app-gkd-release.apk`）
+
+> 系统要求：Android 16 及以上。应用内“设置 - 关于 - 检测更新”会自动检查本仓库的新版本。
 
 通用问题可参考官方 [疑难解答](https://gkd.li/guide/faq)
 
