@@ -18,6 +18,7 @@ import li.songe.gkd.a11y.useA11yServiceEnabledFlow
 import li.songe.gkd.a11y.useEnabledA11yServicesFlow
 import li.songe.gkd.data.CrashData
 import li.songe.gkd.data.RawSubscription
+import li.songe.gkd.data.trimCrashDataFiles
 import li.songe.gkd.db.DbSet
 import li.songe.gkd.entry.EntryActivity
 import li.songe.gkd.entry.OpenFileActivity
@@ -336,6 +337,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
         }
 
         scope.launchTry(Dispatchers.IO) {
+            trimCrashDataFiles()
             val list = (crashTempFolder.listFiles() ?: emptyArray()).mapNotNull {
                 try {
                     json.decodeFromString<CrashData>(it.readText())

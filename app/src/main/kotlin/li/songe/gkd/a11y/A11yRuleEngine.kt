@@ -525,9 +525,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         }
 
         fun performActionBack(): Boolean {
-            val r1 = privilegeContextFlow.value?.run {
-                inputManager.keyevent(KeyEvent.KEYCODE_BACK)
-            }
+            val r1 = privilegeContextFlow.value?.keyevent(KeyEvent.KEYCODE_BACK)
             if (r1 == true) return true
             return A11yService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true
         }

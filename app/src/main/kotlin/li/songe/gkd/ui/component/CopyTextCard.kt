@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import li.songe.gkd.util.copyText
 import li.songe.gkd.util.throttle
@@ -22,6 +24,9 @@ import li.songe.gkd.util.throttle
 fun CopyTextCard(
     text: String,
     modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.secondary,
+    textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
 ) {
     Box(
         modifier = modifier.fillMaxWidth()
@@ -35,10 +40,10 @@ fun CopyTextCard(
                 text = text,
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.extraSmall)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .background(containerColor)
                     .padding(8.dp),
-                color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.bodyLarge,
+                color = contentColor,
+                style = textStyle,
             )
         }
         PerfIcon(

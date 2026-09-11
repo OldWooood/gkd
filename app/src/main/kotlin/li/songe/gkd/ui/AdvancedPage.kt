@@ -315,6 +315,11 @@ private fun AdvancedContent() {
                 subtitle = "无障碍事件日志",
                 onClick = { mainVm.navigatePage(A11yEventLogRoute) },
             )
+            SettingItem(
+                title = "崩溃记录",
+                subtitle = "应用异常退出记录",
+                onClick = { mainVm.navigatePage(CrashReportRoute) },
+            )
             Spacer(modifier = Modifier.height(EmptyHeight))
         }
     }
