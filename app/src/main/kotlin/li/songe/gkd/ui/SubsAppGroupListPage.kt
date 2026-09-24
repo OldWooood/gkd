@@ -76,7 +76,6 @@ fun SubsAppGroupListPage(route: SubsAppGroupListRoute) {
         val subs = state.subscription
         val configs = state.configs.value
         val subsConfigs = configs?.subsConfigs.orEmpty()
-        val categoryConfigs = configs?.categoryConfigs.orEmpty()
         val switchEnabled = state.configs is Loadable.Ready
         val app = state.app
         val editable = subsItemId < 0
@@ -98,7 +97,7 @@ fun SubsAppGroupListPage(route: SubsAppGroupListRoute) {
                 }
                 if (!mainVm.dialogRequests.confirm(
                     title = "操作提示",
-                    text = "是否将所选规则全部${action}?\n\n注: 也可在「订阅-规则类别」操作",
+                    text = "是否将所选规则全部${action}?",
                 )) return@launchTry
                 val changedSize = vm.updateSelectedEnabled(selectedKeys, enabled)
                 if (changedSize > 0) {
@@ -257,18 +256,13 @@ fun SubsAppGroupListPage(route: SubsAppGroupListRoute) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(app.groups, { it.key }) { group ->
-                    val category = subs.getCategory(group.name)
                     val subsConfig = subsConfigs.find { it.groupKey == group.key }
-                    val categoryConfig = categoryConfigs.find {
-                        it.categoryKey == category?.key
-                    }
                     RuleGroupCard(
                         modifier = Modifier.animateListItem(),
                         subs = subs,
                         appId = appId,
                         group = group,
                         subsConfig = subsConfig,
-                        categoryConfig = categoryConfig,
                         switchEnabled = switchEnabled,
                         onOpen = {
                             mainVm.showRuleGroup(

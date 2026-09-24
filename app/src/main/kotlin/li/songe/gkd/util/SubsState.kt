@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import li.songe.gkd.appScope
 import li.songe.gkd.data.AppRule
-import li.songe.gkd.data.CategoryConfig
 import li.songe.gkd.data.GlobalRule
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.ResolvedAppGroup
@@ -150,26 +149,13 @@ val usedSubsEntriesFlow by lazy {
     )
 }
 
-fun getCategoryEnable(
-    category: RawSubscription.RawCategory?,
-    categoryConfig: CategoryConfig?,
-): Boolean? = if (categoryConfig != null) {
-    // 批量配置
-    categoryConfig.enable
-} else {
-    // 批量默认
-    category?.enable
-}
-
 fun getGroupEnable(
     group: RawSubscription.RawGroupProps,
     subsConfig: SubsConfig?,
-    category: RawSubscription.RawCategory? = null,
-    categoryConfig: CategoryConfig? = null,
 ): Boolean = group.valid && when (group) {
-    // 优先级: 规则用户配置 > 批量配置 > 批量默认 > 规则默认
+    // 优先级: 规则用户配置 > 规则默认
     is RawSubscription.RawAppGroup -> {
-        subsConfig?.enable ?: getCategoryEnable(category, categoryConfig) ?: group.enable ?: true
+        subsConfig?.enable ?: group.enable ?: true
     }
 
     is RawSubscription.RawGlobalGroup -> {
@@ -220,8 +206,7 @@ val ruleSummaryFlow by lazy {
         appInfoMapFlow,
         DbSet.appConfigDao.queryUsedList(),
         DbSet.subsConfigDao.queryUsedList(),
-        DbSet.categoryConfigDao.queryUsedList(),
-    ) { subsEntries, appInfoCache, appConfigs, subsConfigs, categoryConfigs ->
+    ) { subsEntries, appInfoCache, appConfigs, subsConfigs ->
         val globalSubsConfigs = subsConfigs.filter { c -> c.type == SubsConfig.GlobalGroupType }
         val groupSubsConfigs = subsConfigs.filter { c -> c.type == SubsConfig.AppGroupType }
         val appRules = HashMap<String, MutableList<AppRule>>()
@@ -269,7 +254,6 @@ val ruleSummaryFlow by lazy {
             // app scope
             val subAppConfigs = appConfigs.filter { c -> c.subsId == subsItem.id }
             val subGroupSubsConfigs = groupSubsConfigs.filter { c -> c.subsId == subsItem.id }
-            val subCategoryConfigs = categoryConfigs.filter { c -> c.subsId == subsItem.id }
             rawSubs.apps.filter { appRaw ->
                 // 筛选 当前启用的 app 订阅规则
                 appRaw.groups.isNotEmpty() && (subAppConfigs.find { c -> c.appId == appRaw.id }?.enable
@@ -280,15 +264,7 @@ val ruleSummaryFlow by lazy {
                 val subAppGroupToRules = mutableMapOf<RawSubscription.RawAppGroup, List<AppRule>>()
                 val groupAndEnables = appRaw.groups.map { group ->
                     val config = appGroupConfigs.find { c -> c.groupKey == group.key }
-                    val category = rawSubs.getCategory(group.name)
-                    val categoryConfig =
-                        subCategoryConfigs.find { c -> c.categoryKey == category?.key }
-                    val enable = getGroupEnable(
-                        group,
-                        config,
-                        category,
-                        categoryConfig
-                    ) && group.valid
+                    val enable = getGroupEnable(group, config) && group.valid
                     ResolvedAppGroup(
                         group = group,
                         subscription = rawSubs,

@@ -41,8 +41,6 @@ class SubsAppListVm(
     private val groupSubsConfigsFlow =
         DbSet.subsConfigDao.querySubsGroupTypeConfig(route.subsItemId)
 
-    private val categoryConfigsFlow = DbSet.categoryConfigDao.queryConfig(route.subsItemId)
-
     val searchStrFlow: StateFlow<String>
         field = MutableStateFlow("")
     val showSearchBarFlow: StateFlow<Boolean>
@@ -55,22 +53,15 @@ class SubsAppListVm(
     }.stateLoadable()
 
     val enableSizeMapState = subscription.buildUiState { rawSubscription ->
-        combine(
-            categoryConfigsFlow,
-            groupSubsConfigsFlow,
-        ) { categoryConfigs, groupSubsConfigs ->
-            val categoryConfigMap = categoryConfigs.associateBy { it.categoryKey }
+        groupSubsConfigsFlow.map { groupSubsConfigs ->
             val groupSubsConfigMap = groupSubsConfigs
                 .groupBy { it.appId }
                 .mapValues { entry -> entry.value.associateBy { it.groupKey } }
             rawSubscription.apps.associate { rawApp ->
                 val enableSize = rawApp.groups.count { group ->
-                    val category = rawSubscription.getCategory(group.name)
                     getGroupEnable(
                         group,
                         groupSubsConfigMap[rawApp.id]?.get(group.key),
-                        category,
-                        category?.key?.let(categoryConfigMap::get),
                     )
                 }
                 rawApp.id to enableSize

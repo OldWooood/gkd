@@ -3,9 +3,8 @@ package li.songe.gkd.ui
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import li.songe.gkd.data.CategoryConfig
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.data.edit
@@ -19,7 +18,6 @@ import li.songe.gkd.util.toJson5String
 
 data class SubsAppGroupConfigs(
     val subsConfigs: List<SubsConfig>,
-    val categoryConfigs: List<CategoryConfig>,
 )
 
 data class SubsAppGroupListUiState(
@@ -35,21 +33,16 @@ class SubsAppGroupListVm(val route: SubsAppGroupListRoute) : BaseViewModel() {
     private val subsConfigsFlow =
         DbSet.subsConfigDao.queryAppGroupTypeConfig(route.subsItemId, route.appId)
 
-    private val categoryConfigsFlow = DbSet.categoryConfigDao.queryConfig(route.subsItemId)
-
     val uiState = subscription.buildUiState(
         initialValue = { rawSubscription ->
             buildUiState(rawSubscription, Loadable.Loading)
         },
     ) { rawSubscription ->
-        combine(subsConfigsFlow, categoryConfigsFlow) { configs, categoryConfigs ->
+        subsConfigsFlow.map { configs ->
             buildUiState(
                 rawSubscription = rawSubscription,
                 configs = Loadable.Ready(
-                    SubsAppGroupConfigs(
-                        subsConfigs = configs,
-                        categoryConfigs = categoryConfigs,
-                    ),
+                    SubsAppGroupConfigs(subsConfigs = configs),
                 ),
             )
         }

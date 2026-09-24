@@ -37,7 +37,6 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 import li.songe.gkd.META
 import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.ui.component.AnimatedBooleanContent
 import li.songe.gkd.ui.component.PerfIcon
@@ -64,7 +63,6 @@ fun WorkModePage() {
     val vm = viewModel<WorkModeVm>()
     val writeSecureSettings by PermissionStates.writeSecureSettings.stateFlow.collectAsStateWithLifecycle()
     val a11yRunning by A11yService.isRunning.collectAsStateWithLifecycle()
-    val privilegeContext by privilegeContextFlow.collectAsStateWithLifecycle()
     val automatorMode by mainVm.automatorModeFlow.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection), topBar = {
@@ -213,78 +211,6 @@ fun WorkModePage() {
                 ) {
                     Text(
                         text = "无感保活",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(
-                modifier = Modifier
-                    .padding(horizontal = itemHorizontalPadding)
-                    .fillMaxWidth(),
-                onClick = throttle {
-                    if (privilegeContext == null) {
-                        mainVm.navigatePage(PrivilegeServiceRoute)
-                        return@throttle
-                    }
-                    mainVm.updateAutomatorMode(AutomatorModeOption.AutomationMode)
-                },
-                colors = surfaceCardColors,
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = automatorMode == AutomatorModeOption.AutomationMode,
-                        onClick = null,
-                    )
-                    Text(
-                        modifier = Modifier.padding(start = 12.dp),
-                        text = AutomatorModeOption.AutomationMode.label,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                TextListItem(
-                    modifier = Modifier
-                        .padding(horizontal = cardHorizontalPadding)
-                        .padding(start = 8.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    list = listOf(
-                        "自动化驱动的无障碍",
-                        "不会导致界面显示异常",
-                        "不会被应用检测为无障碍",
-                        "若不兼容可配置「局部无障碍」",
-                    ),
-                )
-                AnimatedBooleanContent(
-                    targetState = privilegeContext != null,
-                    contentTrue = {
-                        Text(
-                            modifier = Modifier
-                                .padding(horizontal = cardHorizontalPadding)
-                                .padding(start = 8.dp, top = 8.dp),
-                            text = "已连接特权服务，可继续使用",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    },
-                    contentFalse = {
-                        PrivilegeAuthButton(
-                            modifier = Modifier.padding(
-                                start = cardHorizontalPadding
-                            )
-                        )
-                    }
-                )
-                TextButton(
-                    modifier = Modifier.padding(start = cardHorizontalPadding),
-                    onClick = throttle {
-                        mainVm.navigatePage(A11YScopeAppListRoute)
-                    },
-                ) {
-                    Text(
-                        text = "局部无障碍",
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }

@@ -93,7 +93,6 @@ fun AppConfigPage(route: AppConfigRoute) {
     val firstLoading = loadableState is Loadable.Loading
     val loadError = (loadableState as? Loadable.Failure)?.cause
     val globalSubsConfigs = state?.globalSubsConfigs.orEmpty()
-    val categoryConfigs = state?.categoryConfigs.orEmpty()
     val appSubsConfigs = state?.appSubsConfigs.orEmpty()
     val subsPairs = state?.subsPairs.orEmpty()
     val groupSize = subsPairs.sumOf { it.second.size }
@@ -123,7 +122,7 @@ fun AppConfigPage(route: AppConfigRoute) {
             }
             if (!mainVm.dialogRequests.confirm(
                 title = "操作提示",
-                text = "是否将所选规则全部${action}?\n\n注: 也可在「订阅-规则类别」操作",
+                text = "是否将所选规则全部${action}?",
             )) return@launchTry
             val changedSize = vm.updateSelectedEnabled(selectedDataSet, enabled)
             if (changedSize > 0) {
@@ -346,15 +345,6 @@ fun AppConfigPage(route: AppConfigRoute) {
                         is RawSubscription.RawAppGroup -> appSubsConfigs
                         is RawSubscription.RawGlobalGroup -> globalSubsConfigs
                     }.find { it.subsId == entry.subsItem.id && it.groupKey == group.key }
-                    val category = when (group) {
-                        is RawSubscription.RawAppGroup -> entry.subscription.getCategory(group.name)
-                        is RawSubscription.RawGlobalGroup -> null
-                    }
-                    val categoryConfig = if (category != null) {
-                        categoryConfigs.find { it.subsId == subsId && it.categoryKey == category.key }
-                    } else {
-                        null
-                    }
                     val isSelected = selectedDataSet.any {
                         it.subsId == subsId && it.groupType == group.groupType && it.groupKey == group.key
                     }
@@ -382,7 +372,6 @@ fun AppConfigPage(route: AppConfigRoute) {
                         appId = appId,
                         group = group,
                         subsConfig = subsConfig,
-                        categoryConfig = categoryConfig,
                         onOpen = {
                             mainVm.showRuleGroup(
                                 subscriptionId = subsId,

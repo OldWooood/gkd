@@ -8,10 +8,8 @@ import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDe
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import li.songe.gkd.ui.A11YScopeAppListRoute
 import li.songe.gkd.ui.A11yEventLogPage
 import li.songe.gkd.ui.A11yEventLogRoute
-import li.songe.gkd.ui.A11yScopeAppListPage
 import li.songe.gkd.ui.AboutPage
 import li.songe.gkd.ui.AboutRoute
 import li.songe.gkd.ui.ActionLogPage
@@ -40,10 +38,6 @@ import li.songe.gkd.ui.SubsAppGroupListPage
 import li.songe.gkd.ui.SubsAppGroupListRoute
 import li.songe.gkd.ui.SubsAppListPage
 import li.songe.gkd.ui.SubsAppListRoute
-import li.songe.gkd.ui.SubsCategoryGroupPage
-import li.songe.gkd.ui.SubsCategoryGroupRoute
-import li.songe.gkd.ui.SubsCategoryPage
-import li.songe.gkd.ui.SubsCategoryRoute
 import li.songe.gkd.ui.SubsGlobalGroupExcludePage
 import li.songe.gkd.ui.SubsGlobalGroupExcludeRoute
 import li.songe.gkd.ui.SubsGlobalGroupListPage
@@ -66,14 +60,12 @@ private val mainRouteEntryProvider = entryProvider {
     entry<AdvancedPageRoute> { AdvancedPage() }
     entry<PrivilegeServiceRoute> { PrivilegeServicePage() }
     entry<SnapshotPageRoute> { SnapshotPage() }
-    entry<A11YScopeAppListRoute> { A11yScopeAppListPage() }
     entry<ActivityLogRoute> { ActivityLogPage() }
     entry<A11yEventLogRoute> { A11yEventLogPage() }
     entry<EditBlockAppListRoute> { EditBlockAppListPage() }
     entry<SlowGroupRoute> { SlowGroupPage() }
     entry<SubsAppListRoute> { SubsAppListPage(it) }
     entry<WebViewRoute> { WebViewPage(it) }
-    entry<SubsCategoryRoute> { SubsCategoryPage(it) }
     entry<SubsGlobalGroupListRoute> { SubsGlobalGroupListPage(it) }
     entry<SubsGlobalGroupExcludeRoute> { SubsGlobalGroupExcludePage(it) }
     entry<ActionLogRoute> { ActionLogPage(it) }
@@ -82,7 +74,6 @@ private val mainRouteEntryProvider = entryProvider {
     entry<SubsAppGroupListRoute> { SubsAppGroupListPage(it) }
     entry<AppConfigRoute> { AppConfigPage(it) }
     entry<CrashReportRoute> { CrashReportPage() }
-    entry<SubsCategoryGroupRoute> { SubsCategoryGroupPage(it) }
 }
 
 @Composable

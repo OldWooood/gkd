@@ -40,16 +40,12 @@ import li.songe.gkd.R
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.priv.PrivilegeServiceStatus
-import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.priv.privilegeServiceStatusFlow
-import li.songe.gkd.priv.uiAutomationFlow
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.service.ActivityService
 import li.songe.gkd.service.StatusService
 import li.songe.gkd.service.a11yPartDisabledFlow
 import li.songe.gkd.service.switchAutomatorService
-import li.songe.gkd.service.topAppIdFlow
-import li.songe.gkd.store.actualA11yScopeAppList
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.ActionLogRoute
 import li.songe.gkd.ui.ActivityLogRoute
@@ -82,7 +78,6 @@ fun useDashboardPage(): ScaffoldExt {
     val vm = viewModel<DashboardVm>()
     val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
-    val privilegeContext by privilegeContextFlow.collectAsStateWithLifecycle()
     val privilegeServiceStatus by privilegeServiceStatusFlow.collectAsStateWithLifecycle()
     val automatorMode by mainVm.automatorModeFlow.collectAsStateWithLifecycle()
     val pageScrollState = rememberColumnScrollState()
@@ -157,62 +152,33 @@ fun useDashboardPage(): ScaffoldExt {
                     }
                 }
             }
-            if (store.useA11y || actualA11yScopeAppList.contains(topAppIdFlow.collectAsStateWithLifecycle().value)) {
-                ServiceStatusCard(
-                    subtitle = if (a11yRunning) {
-                        "无障碍正在运行"
-                    } else if (mainVm.a11yServiceEnabledFlow.collectAsStateWithLifecycle().value) {
-                        "无障碍发生故障"
-                    } else if (writeSecureSettings) {
-                        if (store.enableAutomator && a11yPartDisabledFlow.collectAsStateWithLifecycle().value) {
-                            "无障碍局部关闭"
-                        } else {
-                            "无障碍已关闭"
-                        }
+            ServiceStatusCard(
+                subtitle = if (a11yRunning) {
+                    "无障碍正在运行"
+                } else if (mainVm.a11yServiceEnabledFlow.collectAsStateWithLifecycle().value) {
+                    "无障碍发生故障"
+                } else if (writeSecureSettings) {
+                    if (store.enableAutomator && a11yPartDisabledFlow.collectAsStateWithLifecycle().value) {
+                        "无障碍局部关闭"
                     } else {
-                        "无障碍未授权"
-                    },
-                    checked = a11yRunning,
-                    onCheckedChange = { newEnabled ->
-                        if (newEnabled && !PermissionStates.writeSecureSettings.value) {
-                            mainVm.navigatePage(WorkModeRoute)
-                        } else {
-                            switchAutomatorService()
-                        }
-                    },
-                    mode = automatorMode.label,
-                    onModeClick = {
+                        "无障碍已关闭"
+                    }
+                } else {
+                    "无障碍未授权"
+                },
+                checked = a11yRunning,
+                onCheckedChange = { newEnabled ->
+                    if (newEnabled && !PermissionStates.writeSecureSettings.value) {
                         mainVm.navigatePage(WorkModeRoute)
-                    },
-                )
-            } else {
-                val automation by uiAutomationFlow.collectAsStateWithLifecycle()
-                ServiceStatusCard(
-                    subtitle = if (automation != null) {
-                        "自动化正在运行"
-                    } else if (privilegeContext == null) {
-                        "自动化未授权"
                     } else {
-                        if (store.enableAutomator && a11yPartDisabledFlow.collectAsStateWithLifecycle().value) {
-                            "自动化局部关闭"
-                        } else {
-                            "自动化已关闭"
-                        }
-                    },
-                    checked = automation != null,
-                    onCheckedChange = { newEnabled ->
-                        if (newEnabled && privilegeContext == null) {
-                            mainVm.navigatePage(PrivilegeServiceRoute)
-                        } else {
-                            switchAutomatorService()
-                        }
-                    },
-                    mode = automatorMode.label,
-                    onModeClick = {
-                        mainVm.navigatePage(WorkModeRoute)
-                    },
-                )
-            }
+                        switchAutomatorService()
+                    }
+                },
+                mode = automatorMode.label,
+                onModeClick = {
+                    mainVm.navigatePage(WorkModeRoute)
+                },
+            )
 
             PageSwitchItemCard(
                 imageVector = PerfIcon.Notifications,

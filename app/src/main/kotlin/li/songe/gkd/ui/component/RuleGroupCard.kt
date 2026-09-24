@@ -28,7 +28,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import li.songe.gkd.data.CategoryConfig
 import li.songe.gkd.data.ExcludeData
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsConfig
@@ -47,7 +46,6 @@ fun RuleGroupCard(
     appId: String?,
     group: RawSubscription.RawGroupProps,
     subsConfig: SubsConfig?,
-    categoryConfig: CategoryConfig?,
     switchEnabled: Boolean = true,
     onOpen: () -> Unit,
     onCheckedChange: (Boolean) -> Unit,
@@ -58,8 +56,6 @@ fun RuleGroupCard(
     onLongClick: () -> Unit = {},
     onSelectedChange: () -> Unit = {},
 ) {
-    val category = subs.getCategory(group.name)
-
     val inGlobalAppPage = appId != null && group is RawSubscription.RawGlobalGroup
 
     var highlighted by remember { mutableStateOf(false) }
@@ -95,12 +91,7 @@ fun RuleGroupCard(
             appId,
         )
     } else {
-        getGroupEnable(
-            group,
-            subsConfig,
-            category,
-            categoryConfig,
-        )
+        getGroupEnable(group, subsConfig)
     }
     val onClick = if (isSelectedMode) onSelectedChange else throttle(onOpen)
     val containerColor = animateColorAsState(
@@ -233,7 +224,6 @@ fun getActualGroupChecked(
     group: RawSubscription.RawGroupProps,
     appId: String?,
     subsConfig: SubsConfig?,
-    categoryConfig: CategoryConfig?,
 ): Boolean {
     if (!group.valid) return false
     val inGlobalAppPage = appId != null && group is RawSubscription.RawGlobalGroup
@@ -245,12 +235,7 @@ fun getActualGroupChecked(
             appId,
         )
     } else {
-        getGroupEnable(
-            group,
-            subsConfig,
-            subs.getCategory(group.name),
-            categoryConfig,
-        )
+        getGroupEnable(group, subsConfig)
     } ?: false
 }
 

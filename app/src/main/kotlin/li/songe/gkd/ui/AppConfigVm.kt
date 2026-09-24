@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import li.songe.gkd.data.ActionLog
-import li.songe.gkd.data.CategoryConfig
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.db.DbSet
@@ -39,14 +38,12 @@ import li.songe.gkd.util.toJson5String
 data class AppConfigUiState(
     val globalSubsConfigs: List<SubsConfig>,
     val appSubsConfigs: List<SubsConfig>,
-    val categoryConfigs: List<CategoryConfig>,
     val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawGroupProps>>>,
 )
 
 private data class AppConfigDatabaseState(
     val globalSubsConfigs: List<SubsConfig>,
     val appSubsConfigs: List<SubsConfig>,
-    val categoryConfigs: List<CategoryConfig>,
     val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawGroupProps>>>,
     val checkedGroupKeys: Set<Triple<Long, Int, Int>>,
 )
@@ -91,8 +88,7 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                 combine(
                     DbSet.subsConfigDao.queryUsedGlobalConfig(),
                     DbSet.subsConfigDao.queryAppConfig(usedSubsIds, route.appId),
-                    DbSet.categoryConfigDao.queryBySubsIds(usedSubsIds),
-                ) { globalConfigs, appConfigs, categoryConfigs ->
+                ) { globalConfigs, appConfigs ->
                     val subsPairs = entries.map { entry ->
                         val globalGroups = entry.subscription.globalGroups.filter { group ->
                             globalConfigs.find {
@@ -116,24 +112,11 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                                 }.find {
                                     it.subsId == entry.subsItem.id && it.groupKey == group.key
                                 }
-                                val category = when (group) {
-                                    is RawSubscription.RawAppGroup ->
-                                        entry.subscription.getCategory(group.name)
-
-                                    is RawSubscription.RawGlobalGroup -> null
-                                }
-                                val categoryConfig = category?.let { targetCategory ->
-                                    categoryConfigs.find {
-                                        it.subsId == entry.subsItem.id &&
-                                            it.categoryKey == targetCategory.key
-                                    }
-                                }
                                 val checked = getActualGroupChecked(
                                     subs = entry.subscription,
                                     group = group,
                                     appId = route.appId,
                                     subsConfig = subsConfig,
-                                    categoryConfig = categoryConfig,
                                 ) && (
                                     group !is RawSubscription.RawGlobalGroup ||
                                         subsConfig?.enable != false
@@ -147,7 +130,6 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                     AppConfigDatabaseState(
                         globalSubsConfigs = globalConfigs,
                         appSubsConfigs = appConfigs,
-                        categoryConfigs = categoryConfigs,
                         subsPairs = subsPairs,
                         checkedGroupKeys = checkedGroupKeys,
                     )
@@ -243,7 +225,6 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
             AppConfigUiState(
                 globalSubsConfigs = database.globalSubsConfigs,
                 appSubsConfigs = database.appSubsConfigs,
-                categoryConfigs = database.categoryConfigs,
                 subsPairs = sortedPairs,
             )
         )

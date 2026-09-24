@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import li.songe.gkd.MainViewModel
-import li.songe.gkd.data.CategoryConfig
 import li.songe.gkd.data.ExcludeData
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsConfig
@@ -42,18 +41,6 @@ data class ShowGroupState(
         }
 
     suspend fun querySubsConfig(): SubsConfig? = querySubsConfigFlow().first()
-
-    suspend fun queryCategoryConfig(): CategoryConfig? {
-        groupKey ?: error("require groupKey")
-        val subs = SubscriptionStore.awaitSubscription(subsId)
-        val group = if (groupType == SubsConfig.AppGroupType) {
-            subs.apps.find { it.id == appId }?.groups
-        } else {
-            subs.globalGroups
-        }?.find { it.key == groupKey } ?: error("require group")
-        val category = subs.getCategory(group.name) ?: return null
-        return DbSet.categoryConfigDao.queryCategoryConfig(subsId, category.key).first()
-    }
 }
 
 private fun ShowGroupState.querySubsConfigFlow(): Flow<SubsConfig?> {
@@ -155,18 +142,12 @@ suspend fun batchUpdateGroupEnable(
             return@map null
         }
         val subsConfig = g.querySubsConfig()
-        val categoryConfig = g.queryCategoryConfig()
         if (enable == null && subsConfig?.enable == null && subsConfig?.exclude.isNullOrEmpty()) {
             return@map null
         }
         val newSubsConfig = if (g.appId != null) {
             targetGroup as RawSubscription.RawAppGroup
-            val oldEnable = getGroupEnable(
-                targetGroup,
-                subsConfig,
-                subscription.getCategory(targetGroup.name),
-                categoryConfig
-            )
+            val oldEnable = getGroupEnable(targetGroup, subsConfig)
             // app rule
             val newSubsConfig = (subsConfig?.copy(enable = enable) ?: SubsConfig(
                 type = SubsConfig.AppGroupType,
@@ -175,12 +156,7 @@ suspend fun batchUpdateGroupEnable(
                 groupKey = g.groupKey,
                 enable = enable
             ))
-            val newEnable = getGroupEnable(
-                targetGroup,
-                newSubsConfig,
-                subscription.getCategory(targetGroup.name),
-                categoryConfig
-            )
+            val newEnable = getGroupEnable(targetGroup, newSubsConfig)
             if (enable == newEnable && oldEnable == newEnable) {
                 return@map null
             }

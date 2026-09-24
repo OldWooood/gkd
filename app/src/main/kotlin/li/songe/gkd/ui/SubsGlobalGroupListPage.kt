@@ -252,7 +252,6 @@ fun SubsGlobalGroupListPage(route: SubsGlobalGroupListRoute) {
                         focusGroup = focusGroup,
                         onFocusHandled = vm::consumeFocusGroup,
                         subsConfig = subsConfig,
-                        categoryConfig = null,
                         switchEnabled = switchEnabled,
                         onOpen = {
                             mainVm.showRuleGroup(

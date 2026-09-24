@@ -4,11 +4,9 @@ import android.provider.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -20,9 +18,7 @@ import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.isActivityVisible
 import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.priv.AutomationService
 import li.songe.gkd.priv.privilegeContextFlow
-import li.songe.gkd.priv.uiAutomationFlow
 import li.songe.gkd.store.actualA11yScopeAppList
 import li.songe.gkd.store.actualBlockA11yAppList
 import li.songe.gkd.store.storeFlow
@@ -33,9 +29,7 @@ import li.songe.gkd.util.toast
 import kotlin.time.Duration.Companion.milliseconds
 
 class GkdTileService : BaseTileService() {
-    override val activeFlow = combine(A11yService.isRunning, uiAutomationFlow) { a11y, automator ->
-        a11y || automator != null
-    }.stateIn(scope, SharingStarted.Eagerly, false)
+    override val activeFlow: StateFlow<Boolean> = A11yService.isRunning
 
     init {
         onTileClicked { switchAutomatorService() }
@@ -83,20 +77,8 @@ private suspend fun switchA11yService() {
     }
 }
 
-private fun switchAutomationService() {
-    val newEnabled = uiAutomationFlow.value == null
-    uiAutomationFlow.value?.shutdown()
-    if (newEnabled && privilegeContextFlow.value != null) {
-        AutomationService.tryConnect()
-    }
-}
-
 fun switchAutomatorService() = modifyA11yRun {
-    if (currentAppUseA11y) {
-        switchA11yService()
-    } else {
-        switchAutomationService()
-    }
+    switchA11yService()
 }
 
 private fun skipBlockApp(): Boolean {
@@ -129,33 +111,20 @@ private suspend fun fixA11yService() {
         names.add(A11yService.a11yCn)
         app.putSecureA11yServices(names)
         delay(A11Y_AWAIT_START_TIME.milliseconds)
-        if (currentAppUseA11y && !A11yService.isRunning.value) {
+        if (!A11yService.isRunning.value) {
             toast("重启无障碍失败")
             accessRestrictedSettingsShowFlow.value = true
         }
     }
 }
 
-private fun fixAutomationService() {
-    if (uiAutomationFlow.value == null && privilegeContextFlow.value != null) {
-        if (skipBlockApp()) return
-        if (currentAppUseA11y) return
-        AutomationService.tryConnect(true)
-    }
-}
-
 fun fixRestartAutomatorService() = modifyA11yRun {
     if (storeFlow.value.enableAutomator) {
-        if (currentAppUseA11y) {
-            fixA11yService()
-        } else {
-            fixAutomationService()
-        }
+        fixA11yService()
     }
 }
 
-val currentAppUseA11y
-    get() = storeFlow.value.useA11y || topAppIdFlow.value in actualA11yScopeAppList
+val currentAppUseA11y = true
 
 val currentAppBlocked
     get() = storeFlow.value.enableBlockA11yAppList && topAppIdFlow.value in actualBlockA11yAppList
@@ -166,22 +135,17 @@ private fun innerForcedUpdateA11yService(disabled: Boolean) {
     }
     if (disabled) {
         A11yService.instance?.shutdown(true)
-        uiAutomationFlow.value?.shutdown(true)
         return
     }
-    if (currentAppUseA11y) {
-        if (A11yService.isRunning.value) {
-            return
-        }
-        if (!PermissionStates.writeSecureSettings.stateFlow.value) {
-            return
-        }
-        val names = app.getSecureA11yServices()
-        names.add(A11yService.a11yCn)
-        app.putSecureA11yServices(names)
-    } else {
-        AutomationService.tryConnect(true)
+    if (A11yService.isRunning.value) {
+        return
     }
+    if (!PermissionStates.writeSecureSettings.stateFlow.value) {
+        return
+    }
+    val names = app.getSecureA11yServices()
+    names.add(A11yService.a11yCn)
+    app.putSecureA11yServices(names)
 }
 
 private fun forcedUpdateA11yService(disabled: Boolean) = modifyA11yRun {
@@ -211,7 +175,7 @@ fun initA11yWhiteAppList() {
         actualFlow.collect {
             lastAppIdChangeTime = System.currentTimeMillis()
             if (!currentAppBlocked) {
-                if (topActivityFlow.value.sameAs(systemRecentCn) && currentAppUseA11y) {
+                if (topActivityFlow.value.sameAs(systemRecentCn)) {
                     // 切换无障碍会造成卡顿，在最近任务界面时，延迟这个卡顿
                     val tempTime = lastAppIdChangeTime
                     runMainPost(A11Y_WHITE_APP_AWAIT_TIME) {
