@@ -42,17 +42,14 @@ import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.priv.PrivilegeServiceStatus
 import li.songe.gkd.priv.privilegeServiceStatusFlow
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.service.ActivityService
 import li.songe.gkd.service.StatusService
 import li.songe.gkd.service.a11yPartDisabledFlow
 import li.songe.gkd.service.switchAutomatorService
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.ActionLogRoute
-import li.songe.gkd.ui.ActivityLogRoute
 import li.songe.gkd.ui.AppConfigRoute
 import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.WebViewRoute
-import li.songe.gkd.ui.WorkModeRoute
 import li.songe.gkd.ui.component.GroupNameText
 import li.songe.gkd.ui.component.PerfIcon
 import li.songe.gkd.ui.component.PerfIconButton
@@ -69,6 +66,7 @@ import li.songe.gkd.util.HOME_PAGE_URL
 import li.songe.gkd.util.latestRecordDescFlow
 import li.songe.gkd.util.latestRecordFlow
 import li.songe.gkd.util.launchTry
+import li.songe.gkd.util.openA11ySettings
 import li.songe.gkd.util.throttle
 
 @Composable
@@ -169,14 +167,14 @@ fun useDashboardPage(): ScaffoldExt {
                 checked = a11yRunning,
                 onCheckedChange = { newEnabled ->
                     if (newEnabled && !PermissionStates.writeSecureSettings.value) {
-                        mainVm.navigatePage(WorkModeRoute)
+                        openA11ySettings()
                     } else {
                         switchAutomatorService()
                     }
                 },
                 mode = automatorMode.label,
                 onModeClick = {
-                    mainVm.navigatePage(WorkModeRoute)
+                    openA11ySettings()
                 },
             )
 
@@ -209,17 +207,6 @@ fun useDashboardPage(): ScaffoldExt {
                     }
                 },
             )
-
-            if (ActivityService.isRunning.collectAsStateWithLifecycle().value) {
-                PageItemCard(
-                    title = "界面日志",
-                    subtitle = "记录打开的应用及界面",
-                    imageVector = PerfIcon.Layers,
-                    onClickLabel = "打开界面日志页面",
-                    onClick = {
-                        mainVm.navigatePage(ActivityLogRoute)
-                    })
-            }
 
             PageItemCard(
                 title = "了解 GKD",

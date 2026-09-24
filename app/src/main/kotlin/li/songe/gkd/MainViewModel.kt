@@ -9,16 +9,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import li.songe.gkd.a11y.useA11yServiceEnabledFlow
 import li.songe.gkd.a11y.useEnabledA11yServicesFlow
-import li.songe.gkd.data.CrashData
 import li.songe.gkd.data.RawSubscription
-import li.songe.gkd.data.trimCrashDataFiles
 import li.songe.gkd.db.DbSet
 import li.songe.gkd.entry.EntryActivity
 import li.songe.gkd.entry.OpenFileActivity
@@ -30,13 +26,9 @@ import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.store.createTextFlow
 import li.songe.gkd.store.storeFlow
-import li.songe.gkd.ui.AdvancedPageRoute
-import li.songe.gkd.ui.CrashReportRoute
 import li.songe.gkd.ui.PrivilegeServiceRoute
-import li.songe.gkd.ui.SnapshotPageRoute
 import li.songe.gkd.ui.WebViewRoute
 import li.songe.gkd.ui.component.DialogRequests
-import li.songe.gkd.ui.component.GithubUploadState
 import li.songe.gkd.ui.component.RuleGroupState
 import li.songe.gkd.ui.component.ShareLogState
 import li.songe.gkd.ui.component.ShowGroupState
@@ -46,6 +38,7 @@ import li.songe.gkd.ui.component.TextDialogState
 import li.songe.gkd.ui.home.BottomNavItem
 import li.songe.gkd.ui.home.HomeRoute
 import li.songe.gkd.ui.share.BaseViewModel
+import li.songe.gkd.ui.share.Loadable
 import li.songe.gkd.ui.share.ActivityResultRequests
 import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.BackupUtils
@@ -57,18 +50,13 @@ import li.songe.gkd.util.ThrottleTimer
 import li.songe.gkd.util.UpdateStatus
 import li.songe.gkd.util.appIconMapFlow
 import li.songe.gkd.util.clearCache
-import li.songe.gkd.util.crashFolder
-import li.songe.gkd.util.crashTempFolder
 import li.songe.gkd.util.findOption
-import li.songe.gkd.util.json
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.openWeChatScaner
 import li.songe.gkd.util.runMainPost
 import li.songe.gkd.util.toast
 import li.songe.loc.Loc
-import java.nio.file.Files
 import kotlin.reflect.jvm.jvmName
-import kotlin.time.Duration.Companion.days
 
 data class PageScrollResetRequest(
     val id: Long,
@@ -140,15 +128,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
     val updateStatus = if (META.updateEnabled) UpdateStatus(scope) else null
 
-    val githubUpload = GithubUploadState(
-        scope = scope,
-        onOpenCookieHelp = { navigateWebPage(ShortUrlSet.URL1) },
-    )
-
-    val shareLog = ShareLogState(
-        scope = scope,
-        githubUpload = githubUpload,
-    )
+    val shareLog = ShareLogState(scope = scope)
 
     val subsLinkDialog = SubsLinkDialogState(
         onOpenHelp = { navigateWebPage(ShortUrlSet.URL5) },
@@ -160,9 +140,8 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     val subsSheet = SubsSheetState()
 
     val appOrderListState = DbSet.actionLogDao.queryLatestUniqueAppIds().stateLoadable()
-    val appVisitOrderMapState = DbSet.appVisitLogDao.query().map {
-        it.mapIndexed { i, appId -> appId to i }.toMap()
-    }.debounce(500).stateLoadable()
+    val appVisitOrderMapState: StateFlow<Loadable<Map<String, Int>>>
+        field = MutableStateFlow(Loadable.Ready(emptyMap()))
 
     val ruleGroupState = RuleGroupState(this)
 
@@ -230,8 +209,6 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
                     }
                 }
 
-                "/1" -> navigatePage(AdvancedPageRoute)
-                "/2" -> navigatePage(SnapshotPageRoute)
                 "/3", "/4" -> navigatePage(PrivilegeServiceRoute)
                 else -> notFoundToast()
             }
@@ -318,12 +295,6 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
         }
     }
 
-    private var tempCrashDataList = emptyList<CrashData>()
-
-    fun takeCrashDataList(): List<CrashData> = tempCrashDataList.also {
-        tempCrashDataList = emptyList()
-    }
-
     init {
         // preload
         appIconMapFlow.value
@@ -334,33 +305,6 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
         if (termsAcceptedFlow.value && updateStatus?.canRecheck == true) {
             updateStatus.checkUpdate()
-        }
-
-        scope.launchTry(Dispatchers.IO) {
-            trimCrashDataFiles()
-            val list = (crashTempFolder.listFiles() ?: emptyArray()).mapNotNull {
-                try {
-                    json.decodeFromString<CrashData>(it.readText())
-                } catch (e: Exception) {
-                    LogUtils.d("解析崩溃日志失败: ${it.name}", e)
-                    null
-                }
-            }.sortedBy { -it.mtime }
-            crashTempFolder.deleteRecursively()
-            val t = System.currentTimeMillis()
-            crashFolder.listFiles()?.filter {
-                val name = it.name
-                !list.any { f -> name == f.filename }
-            }?.forEach {
-                val mtime = Files.getLastModifiedTime(it.toPath()).toMillis()
-                if (t - mtime > 30.days.inWholeMilliseconds) {
-                    it.delete()
-                }
-            }
-            tempCrashDataList = list
-            if (list.isNotEmpty()) {
-                navigatePage(CrashReportRoute)
-            }
         }
 
         // for OnSimpleLife

@@ -27,7 +27,6 @@ import li.songe.gkd.data.RpcError
 import li.songe.gkd.data.RuleStatus
 import li.songe.gkd.isActivityVisible
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.service.EventLogStore
 import li.songe.gkd.service.topAppIdFlow
 import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.priv.uiAutomationFlow
@@ -164,7 +163,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             }
             lastContentEventTime = a11yEvent.time
         }
-        EventLogStore.logEvent(event)
         if (META.debuggable) {
             Log.d(
                 "onNewA11yEvent",
@@ -462,11 +460,10 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             val nodeVal = (lastNode ?: getTimeoutActiveWindow()) ?: continue
             val rightAppId = nodeVal.packageName?.toString() ?: break
             val matchApp = rule.matchActivity(rightAppId)
-            if (topActivityFlow.value.appId != rightAppId || (!matchApp && rule is AppRule)) {
+            if (topActivityFlow.value.appId != rightAppId || !matchApp) {
                 scope.launch(eventDispatcher) { fixAppId(rightAppId) }
                 return
             }
-            if (!matchApp) continue
             val target = a11yContext.queryRule(rule, nodeVal) ?: continue
             if (rule.checkDelay() && rule.actionDelayJob.value == null) {
                 rule.actionDelayJob.value = scope.launch(actionDispatcher) {

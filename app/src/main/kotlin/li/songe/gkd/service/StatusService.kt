@@ -17,7 +17,6 @@ import li.songe.gkd.notif.NotificationCatalog
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.priv.PrivilegeServiceStatus
 import li.songe.gkd.priv.privilegeServiceStatusFlow
-import li.songe.gkd.priv.uiAutomationFlow
 import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.util.DefaultSimpleLifeImpl
@@ -39,7 +38,6 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
     fun statusTriple(): Triple<String, String, String?> {
         val abRunning = A11yService.isRunning.value
-        val automationRunning = uiAutomationFlow.value != null
         val store = storeFlow.value
         val ruleSummary = ruleSummaryFlow.value
         val count = actionCountFlow.value
@@ -53,33 +51,21 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
             Triple(title, "权限受限，请重新授权", "gkd://page/3")
         } else if (privilegeServiceStatus == PrivilegeServiceStatus.DisconnectedDesired) {
             Triple(title, "特权服务连接已中断，请检查", "gkd://page/4")
-        } else if (!automationRunning && !abRunning) {
-            if (currentAppUseA11y) {
-                val text = if (a11yServiceEnabledFlow.value) {
-                    "无障碍发生故障"
-                } else if (PermissionStates.writeSecureSettings.updateAndGet()) {
-                    if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
-                        val name =
-                            appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
-                        "局部关闭 · $name"
-                    } else {
-                        "无障碍已关闭"
-                    }
+        } else if (!abRunning) {
+            val text = if (a11yServiceEnabledFlow.value) {
+                "无障碍发生故障"
+            } else if (PermissionStates.writeSecureSettings.updateAndGet()) {
+                if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
+                    val name =
+                        appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
+                    "局部关闭 · $name"
                 } else {
-                    "无障碍未授权"
+                    "无障碍已关闭"
                 }
-                Triple(title, text, defaultStatusNotification.uri)
             } else {
-                val text =
-                    if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
-                        val name =
-                            appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
-                        "局部关闭 · $name"
-                    } else {
-                        "自动化已关闭"
-                    }
-                Triple(title, text, defaultStatusNotification.uri)
+                "无障碍未授权"
             }
+            Triple(title, text, defaultStatusNotification.uri)
         } else if (!store.enableMatch) {
             Triple(title, "暂停规则匹配", "gkd://page?tab=1")
         } else if (store.useCustomNotifText) {
@@ -104,7 +90,6 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
             scope.launch {
                 combine(
                     A11yService.isRunning,
-                    uiAutomationFlow,
                     storeFlow,
                     ruleSummaryFlow,
                     privilegeServiceStatusFlow,
@@ -175,7 +160,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
 private val defaultStatusNotification by lazy { NotificationCatalog.status() }
 
 private fun String.replaceTemplate(ruleSummary: RuleSummary, count: Long): String {
-    return replace($$"${i}", ruleSummary.globalGroups.size.toString())
+    return replace($$"${i}", "0")
         .replace($$"${k}", ruleSummary.appSize.toString())
         .replace($$"${u}", ruleSummary.appGroupSize.toString())
         .replace($$"${n}", count.toString())

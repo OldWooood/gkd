@@ -14,84 +14,17 @@ import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.util.LogUtils
-import li.songe.gkd.util.ScreenUtils
-import li.songe.gkd.util.SnapshotExt
 import li.songe.gkd.util.SubscriptionResult
 import li.songe.gkd.util.SubscriptionStore
 import li.songe.gkd.util.UpdateTimeOption
 import li.songe.gkd.util.launchTry
-import li.songe.gkd.util.mapState
-import li.songe.selector.MatchOptions
-import li.songe.selector.Selector
-import li.songe.selector.SelectorCompileResult
-import li.songe.selector.NodeAdapter
 
 
 fun onA11yFeatEvent(event: AccessibilityEvent) = event.run {
     if (event.eventType == STATE_CHANGED) {
-        watchCaptureScreenshot()
         if (event.packageName == launcherAppId) {
             watchAutoUpdateSubs()
         }
-    }
-}
-
-private var tempEventSelector = "" to (null as Selector?)
-private fun AccessibilityEvent.getEventAttr(name: String): Any? = when (name) {
-    "name" -> className
-    "desc" -> contentDescription
-    "text" -> text
-    else -> null
-}
-
-private object A11yEventNodeAdapter : NodeAdapter<AccessibilityEvent>() {
-    override fun getAttr(target: Any, name: String): Any? = when (target) {
-        is AccessibilityEvent -> target.getEventAttr(name)
-        is List<*> -> when (name) {
-            "size" -> target.size
-            else -> null
-        }
-
-        else -> null
-    }
-
-    override fun getInvoke(target: Any, name: String, args: List<Any>): Any? = when (target) {
-        is List<*> -> when (name) {
-            "get" -> (args.singleOrNull() as? Int)?.let(target::getOrNull)
-            else -> null
-        }
-
-        else -> null
-    }
-
-    override fun getName(node: AccessibilityEvent): String? = node.className?.toString()
-
-    override fun getChildCount(node: AccessibilityEvent): Int = 0
-
-    override fun getChild(node: AccessibilityEvent, index: Int): AccessibilityEvent? = null
-
-    override fun getParent(node: AccessibilityEvent): AccessibilityEvent? = null
-
-    override fun getNodeKey(node: AccessibilityEvent): Any = node
-}
-
-private val a11yEventAdapter = A11yEventNodeAdapter
-
-context(event: AccessibilityEvent)
-private fun watchCaptureScreenshot() {
-    if (!storeFlow.value.captureScreenshot) return
-    if (event.packageName != storeFlow.value.screenshotTargetAppId) return
-    if (tempEventSelector.first != storeFlow.value.screenshotEventSelector) {
-        val result = Selector.compile(storeFlow.value.screenshotEventSelector)
-        tempEventSelector = storeFlow.value.screenshotEventSelector to
-            (result as? SelectorCompileResult.Success)?.value
-    }
-    val selector = tempEventSelector.second ?: return
-    selector.match(event, a11yEventAdapter, MatchOptions(fastQuery = false)).let {
-        if (it == null) return
-    }
-    appScope.launchTry {
-        SnapshotExt.captureSnapshot()
     }
 }
 
@@ -127,44 +60,6 @@ private fun initRuleChangedLog() {
                 }.toTypedArray())
             }
         }
-    }
-}
-
-private const val volumeChangedAction = "android.media.VOLUME_CHANGED_ACTION"
-private fun createVolumeReceiver() = object : BroadcastReceiver() {
-    var lastVolumeTriggerTime = -1L
-    override fun onReceive(context: Context?, intent: Intent?) {
-        if (intent?.action == volumeChangedAction) {
-            val t = System.currentTimeMillis()
-            if (t - lastVolumeTriggerTime > 3000 && !ScreenUtils.isScreenLock()) {
-                lastVolumeTriggerTime = t
-                appScope.launchTry {
-                    SnapshotExt.captureSnapshot()
-                }
-            }
-        }
-    }
-}
-
-private fun initCaptureVolume() {
-    var captureVolumeReceiver: BroadcastReceiver? = null
-    val changeRegister: (Boolean) -> Unit = {
-        captureVolumeReceiver?.let(app::unregisterReceiver)
-        captureVolumeReceiver = if (it) {
-            createVolumeReceiver().apply {
-                ContextCompat.registerReceiver(
-                    app,
-                    this,
-                    IntentFilter(volumeChangedAction),
-                    ContextCompat.RECEIVER_EXPORTED
-                )
-            }
-        } else {
-            null
-        }
-    }
-    appScope.launch(Dispatchers.IO) {
-        storeFlow.mapState(appScope) { s -> s.captureVolumeChange }.collect(changeRegister)
     }
 }
 
@@ -208,6 +103,5 @@ private fun initScreenStateReceiver() {
 
 fun initA11yFeat() {
     initRuleChangedLog()
-    initCaptureVolume()
     initScreenStateReceiver()
 }

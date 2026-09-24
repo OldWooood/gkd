@@ -30,7 +30,6 @@ import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.ui.ImagePreviewItem
 import li.songe.gkd.ui.ImagePreviewRoute
 import li.songe.gkd.ui.SubsAppGroupListRoute
-import li.songe.gkd.ui.SubsGlobalGroupListRoute
 import li.songe.gkd.ui.icon.ResetSettings
 import li.songe.gkd.ui.share.LocalDarkTheme
 import li.songe.gkd.ui.share.LocalMainViewModel
@@ -70,18 +69,11 @@ fun RuleGroupDialog(
         getJson5AnnotatedString(textState.value, darkTheme)
     }
     val targetRoute = remember(subs.id, appId, group.key) {
-        if (group is RawSubscription.RawGlobalGroup) {
-            SubsGlobalGroupListRoute(
-                subsItemId = subs.id,
-                focusGroupKey = group.key
-            )
-        } else {
-            SubsAppGroupListRoute(
-                subsItemId = subs.id,
-                appId = appId.toString(),
-                focusGroupKey = group.key
-            )
-        }
+        SubsAppGroupListRoute(
+            subsItemId = subs.id,
+            appId = appId.toString(),
+            focusGroupKey = group.key
+        )
     }
     AppAlertDialog(
         onDismissRequest = onDismissRequest,

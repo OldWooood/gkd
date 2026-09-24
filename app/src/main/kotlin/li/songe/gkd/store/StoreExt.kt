@@ -3,7 +3,6 @@ package li.songe.gkd.store
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import li.songe.gkd.appScope
-import li.songe.gkd.service.ExposeService
 import li.songe.gkd.util.AppListString
 import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.launchTry
@@ -79,7 +78,6 @@ fun initStore() = appScope.launchTry(Dispatchers.IO) {
     blockMatchAppListFlow.value
     blockA11yAppListFlow.value
     a11yScopeAppListFlow.value
-    ExposeService.initCommandFile()
     if (!storeFlow.value.useA11y) {
         // fork 只保留无障碍模式, 旧版本残留的自动化模式需强制迁回
         storeFlow.update { it.copy(automatorMode = AutomatorModeOption.A11yMode.value) }

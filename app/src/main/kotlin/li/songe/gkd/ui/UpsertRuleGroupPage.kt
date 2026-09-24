@@ -87,7 +87,7 @@ fun UpsertRuleGroupPage(route: UpsertRuleGroupRoute) {
             if (forward) {
                 if (appId == null) {
                     mainVm.navigatePage(
-                        SubsGlobalGroupListRoute(subsItemId = subsId),
+                        SubsAppListRoute(subsItemId = subsId),
                         replaced = true,
                     )
                 } else {

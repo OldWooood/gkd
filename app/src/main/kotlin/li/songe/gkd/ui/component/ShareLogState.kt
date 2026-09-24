@@ -25,7 +25,6 @@ import li.songe.gkd.util.throttle
 
 class ShareLogState(
     private val scope: CoroutineScope,
-    private val githubUpload: GithubUploadState,
 ) {
     private val visibleFlow = MutableStateFlow(false)
 
@@ -53,14 +52,6 @@ class ShareLogState(
         }
     }
 
-    private fun upload() {
-        dismiss()
-        githubUpload.startTask(
-            getFile = { buildLogFile() },
-            showHref = { "http://i.gkd.li/log/${it.id}" },
-        )
-    }
-
     @Composable
     fun Render() {
         val visible by visibleFlow.collectAsStateWithLifecycle()
@@ -86,12 +77,6 @@ class ShareLogState(
                         text = "保存到下载",
                         modifier = Modifier
                             .clickable(onClick = throttle { save(context) })
-                            .then(modifier),
-                    )
-                    Text(
-                        text = "生成链接(需科学上网)",
-                        modifier = Modifier
-                            .clickable(onClick = throttle(::upload))
                             .then(modifier),
                     )
                 }

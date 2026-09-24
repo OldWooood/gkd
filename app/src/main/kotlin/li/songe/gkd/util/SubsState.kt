@@ -8,11 +8,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import li.songe.gkd.appScope
 import li.songe.gkd.data.AppRule
-import li.songe.gkd.data.GlobalRule
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.ResolvedAppGroup
 import li.songe.gkd.data.SPLASH_GROUP_NAME_PREFIX
-import li.songe.gkd.data.ResolvedGlobalGroup
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.data.SubsItem
 import li.songe.gkd.db.DbSet
@@ -152,20 +150,9 @@ val usedSubsEntriesFlow by lazy {
 fun getGroupEnable(
     group: RawSubscription.RawGroupProps,
     subsConfig: SubsConfig?,
-): Boolean = group.valid && when (group) {
-    // 优先级: 规则用户配置 > 规则默认
-    is RawSubscription.RawAppGroup -> {
-        subsConfig?.enable ?: group.enable ?: true
-    }
-
-    is RawSubscription.RawGlobalGroup -> {
-        subsConfig?.enable ?: group.enable ?: true
-    }
-}
+): Boolean = group.valid && (subsConfig?.enable ?: group.enable ?: true)
 
 data class RuleSummary(
-    val globalRules: List<GlobalRule> = emptyList(),
-    val globalGroups: List<ResolvedGlobalGroup> = emptyList(),
     val appIdToRules: Map<String, List<AppRule>> = emptyMap(),
     val appIdToGroups: Map<String, List<RawSubscription.RawAppGroup>> = emptyMap(),
     val appIdToAllGroups: Map<String, List<ResolvedAppGroup>> = emptyMap(),
@@ -173,31 +160,16 @@ data class RuleSummary(
     val appSize = appIdToRules.keys.size
     val appGroupSize = appIdToGroups.values.sumOf { s -> s.size }
 
-    val numText = if (globalGroups.size + appGroupSize > 0) {
-        if (globalGroups.isNotEmpty()) {
-            "${globalGroups.size}全局" + if (appGroupSize > 0) {
-                "/"
-            } else {
-                ""
-            }
-        } else {
-            ""
-        } + if (appGroupSize > 0) {
-            "${appSize}应用/${appGroupSize}规则"
-        } else {
-            ""
-        }
+    val numText = if (appGroupSize > 0) {
+        "${appSize}应用/${appGroupSize}规则"
     } else {
         EMPTY_RULE_TIP
     }
 
-    val slowGlobalGroups =
-        globalRules.filter { r -> r.isSlow }.distinctBy { r -> r.group }
-            .map { r -> r.group to r }
     val slowAppGroups =
         appIdToRules.values.flatten().filter { r -> r.isSlow }.distinctBy { r -> r.group }
             .map { r -> r.group to r }
-    val slowGroupCount = slowGlobalGroups.size + slowAppGroups.size
+    val slowGroupCount = slowAppGroups.size
 }
 
 val ruleSummaryFlow by lazy {
@@ -207,50 +179,12 @@ val ruleSummaryFlow by lazy {
         DbSet.appConfigDao.queryUsedList(),
         DbSet.subsConfigDao.queryUsedList(),
     ) { subsEntries, appInfoCache, appConfigs, subsConfigs ->
-        val globalSubsConfigs = subsConfigs.filter { c -> c.type == SubsConfig.GlobalGroupType }
         val groupSubsConfigs = subsConfigs.filter { c -> c.type == SubsConfig.AppGroupType }
         val appRules = HashMap<String, MutableList<AppRule>>()
         val appGroups = HashMap<String, List<RawSubscription.RawAppGroup>>()
         val appAllGroups =
             HashMap<String, List<ResolvedAppGroup>>()
-        val globalRules = mutableListOf<GlobalRule>()
-        val globalGroups = mutableListOf<ResolvedGlobalGroup>()
         subsEntries.forEach { (subsItem, rawSubs) ->
-            // global scope
-            val subGlobalSubsConfigs = globalSubsConfigs.filter { c -> c.subsId == subsItem.id }
-            val subGlobalGroupToRules =
-                mutableMapOf<RawSubscription.RawGlobalGroup, List<GlobalRule>>()
-            rawSubs.globalGroups.filter { g ->
-                // fork 仅保留开屏广告规则
-                g.name.startsWith(SPLASH_GROUP_NAME_PREFIX) &&
-                        (subGlobalSubsConfigs.find { c -> c.groupKey == g.key }?.enable
-                            ?: g.enable ?: true) && g.valid
-            }.forEach { groupRaw ->
-                val config = subGlobalSubsConfigs.find { c -> c.groupKey == groupRaw.key }
-                val g = ResolvedGlobalGroup(
-                    group = groupRaw,
-                    subscription = rawSubs,
-                    subsItem = subsItem,
-                    config = config
-                )
-                globalGroups.add(g)
-                val subRules = groupRaw.rules.map { ruleRaw ->
-                    GlobalRule(
-                        rule = ruleRaw,
-                        g = g,
-                        appInfoCache = appInfoCache,
-                    )
-                }
-                subGlobalGroupToRules[groupRaw] = subRules
-                globalRules.addAll(subRules)
-            }
-            subGlobalGroupToRules.values.forEach {
-                it.forEach { r ->
-                    r.groupToRules = subGlobalGroupToRules
-                }
-            }
-            subGlobalGroupToRules.clear()
-
             // app scope
             val subAppConfigs = appConfigs.filter { c -> c.subsId == subsItem.id }
             val subGroupSubsConfigs = groupSubsConfigs.filter { c -> c.subsId == subsItem.id }
@@ -305,8 +239,6 @@ val ruleSummaryFlow by lazy {
             }
         }
         RuleSummary(
-            globalRules = globalRules,
-            globalGroups = globalGroups,
             appIdToRules = appRules,
             appIdToGroups = appGroups,
             appIdToAllGroups = appAllGroups

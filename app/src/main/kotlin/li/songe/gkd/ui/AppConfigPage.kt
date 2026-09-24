@@ -92,7 +92,6 @@ fun AppConfigPage(route: AppConfigRoute) {
     val state = loadableState.value
     val firstLoading = loadableState is Loadable.Loading
     val loadError = (loadableState as? Loadable.Failure)?.cause
-    val globalSubsConfigs = state?.globalSubsConfigs.orEmpty()
     val appSubsConfigs = state?.appSubsConfigs.orEmpty()
     val subsPairs = state?.subsPairs.orEmpty()
     val groupSize = subsPairs.sumOf { it.second.size }
@@ -341,10 +340,8 @@ fun AppConfigPage(route: AppConfigRoute) {
                     }
                 }
                 items(groups, { Triple(subsId, it.groupType, it.key) }) { group ->
-                    val subsConfig = when (group) {
-                        is RawSubscription.RawAppGroup -> appSubsConfigs
-                        is RawSubscription.RawGlobalGroup -> globalSubsConfigs
-                    }.find { it.subsId == entry.subsItem.id && it.groupKey == group.key }
+                    val subsConfig = appSubsConfigs
+                        .find { it.subsId == entry.subsItem.id && it.groupKey == group.key }
                     val isSelected = selectedDataSet.any {
                         it.subsId == subsId && it.groupType == group.groupType && it.groupKey == group.key
                     }

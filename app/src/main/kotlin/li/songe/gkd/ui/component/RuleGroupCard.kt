@@ -28,10 +28,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import li.songe.gkd.a11y.launcherAppId
 import li.songe.gkd.data.ExcludeData
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsConfig
-import li.songe.gkd.ui.getGlobalGroupChecked
+import li.songe.gkd.util.systemAppsFlow
 import li.songe.gkd.ui.icon.ResetSettings
 import li.songe.gkd.ui.share.noRippleClickable
 import li.songe.gkd.util.getGroupEnable
@@ -56,8 +57,6 @@ fun RuleGroupCard(
     onLongClick: () -> Unit = {},
     onSelectedChange: () -> Unit = {},
 ) {
-    val inGlobalAppPage = appId != null && group is RawSubscription.RawGlobalGroup
-
     var highlighted by remember { mutableStateOf(false) }
     if (focusGroup != null) {
         if (subs.id == focusGroup.first && group.key == focusGroup.third && if (group is RawSubscription.RawAppGroup) appId == focusGroup.second else focusGroup.second == null) {
@@ -83,16 +82,7 @@ fun RuleGroupCard(
     val excludeData = remember(subsConfig?.exclude) {
         ExcludeData.parse(subsConfig?.exclude)
     }
-    val checked = if (inGlobalAppPage) {
-        getGlobalGroupChecked(
-            subs,
-            excludeData,
-            group,
-            appId,
-        )
-    } else {
-        getGroupEnable(group, subsConfig)
-    }
+    val checked = getGroupEnable(group, subsConfig)
     val onClick = if (isSelectedMode) onSelectedChange else throttle(onOpen)
     val containerColor = animateColorAsState(
         if (isSelected || highlighted) {
@@ -116,16 +106,8 @@ fun RuleGroupCard(
             containerColor = containerColor.value
         ),
     ) {
-        val canRest = if (inGlobalAppPage) {
-            excludeData.appIds.contains(appId)
-        } else {
-            subsConfig?.enable != null
-        }
-        val hasExcludeActivity = if (inGlobalAppPage) {
-            checked != null && excludeData.activityIds.any { it.first == appId }
-        } else {
-            excludeData.activityIds.isNotEmpty()
-        }
+        val canRest = subsConfig?.enable != null
+        val hasExcludeActivity = excludeData.activityIds.isNotEmpty()
         Box {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -226,17 +208,30 @@ fun getActualGroupChecked(
     subsConfig: SubsConfig?,
 ): Boolean {
     if (!group.valid) return false
-    val inGlobalAppPage = appId != null && group is RawSubscription.RawGlobalGroup
-    return if (inGlobalAppPage) {
-        getGlobalGroupChecked(
-            subs,
-            ExcludeData.parse(subsConfig?.exclude),
-            group,
-            appId,
-        )
-    } else {
-        getGroupEnable(group, subsConfig)
-    } ?: false
+    return getGroupEnable(group, subsConfig)
+}
+
+// null - 内置禁用
+// true - 启用
+// false - 禁用
+fun getGlobalGroupChecked(
+    subscription: RawSubscription,
+    excludeData: ExcludeData,
+    group: RawSubscription.RawGlobalGroup,
+    appId: String,
+): Boolean? {
+    if (subscription.getGlobalGroupInnerDisabled(group, appId)) {
+        return null
+    }
+    excludeData.appIds[appId]?.let { return !it }
+    if (group.appIdEnable[appId] == true) return true
+    if (appId == launcherAppId) {
+        return group.matchLauncher ?: false
+    }
+    if (systemAppsFlow.value.contains(appId)) {
+        return group.matchSystemApp ?: false
+    }
+    return group.matchAnyApp ?: true
 }
 
 

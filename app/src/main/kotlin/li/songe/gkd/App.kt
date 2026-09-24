@@ -19,7 +19,6 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
-import android.util.Log
 import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
@@ -27,20 +26,16 @@ import android.view.inputmethod.InputMethodManager
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import li.songe.gkd.a11y.initA11yFeat
-import li.songe.gkd.data.CrashData
 import li.songe.gkd.data.selfAppInfo
 import li.songe.gkd.notif.NotificationChannels
 import li.songe.gkd.priv.gkdPrivilegeUiConfig
 import li.songe.gkd.priv.initPrivilege
-import li.songe.gkd.service.clearHttpSubs
 import li.songe.gkd.service.initA11yWhiteAppList
 import li.songe.gkd.store.initStore
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.PKG_FLAGS
-import li.songe.gkd.util.deviceInfoDesc
 import li.songe.gkd.util.initAppState
 import li.songe.gkd.util.SubscriptionStore
 import li.songe.gkd.util.initToast
@@ -50,7 +45,6 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass
 import priv.kit.core.PrivilegeConfig
 import priv.kit.ui.PrivilegeUi
 import kotlin.system.exitProcess
-import kotlin.time.Duration.Companion.milliseconds
 
 
 val appScope by lazy { MainScope() }
@@ -214,25 +208,10 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         LogUtils.d()
-        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
             toast(e.message ?: e.toString())
-            LogUtils.d("UncaughtExceptionHandler", t, e)
-            val mtime = System.currentTimeMillis()
+            LogUtils.d("UncaughtExceptionHandler", e)
             appScope.launchTry(Dispatchers.IO) {
-                CrashData(
-                    id = mtime,
-                    mtime = mtime,
-                    device = deviceInfoDesc,
-                    androidVersionCode = android.os.Build.VERSION.SDK_INT,
-                    androidVersionName = android.os.Build.VERSION.RELEASE,
-                    versionCode = META.versionCode,
-                    versionName = META.versionName,
-                    name = e::class.java.name,
-                    message = e.message,
-                    thread = t.name,
-                    stackTrace = Log.getStackTraceString(e),
-                ).save()
-                delay(1500.milliseconds)
                 if (isActivityVisible) {
                     startLaunchActivity()
                 }
@@ -253,7 +232,6 @@ class App : Application() {
             SubscriptionStore.initialize()
         }
         initA11yWhiteAppList()
-        clearHttpSubs()
         syncFixState()
     }
 }

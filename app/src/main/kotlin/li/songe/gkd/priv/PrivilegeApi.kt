@@ -1,5 +1,6 @@
 package li.songe.gkd.priv
 
+import android.content.Intent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -7,7 +8,6 @@ import kotlinx.coroutines.withContext
 import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.service.ExposeService
 import li.songe.gkd.service.StatusService
 import li.songe.gkd.service.currentAppBlocked
 import li.songe.gkd.service.currentAppUseA11y
@@ -70,7 +70,7 @@ private suspend fun updatePrivilegeContext(serverInfo: PrivilegeServerInfo?) =
             PermissionStates.refreshAll()
             if (StatusService.needRestart) {
                 privilegeContext.startForegroundService(
-                    ExposeService.exposeIntent(expose = -1),
+                    Intent(app, StatusService::class.java),
                 )
             }
             val delayMillis = if (app.justStarted) 1200L else 0L

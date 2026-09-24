@@ -78,25 +78,6 @@ fun SlowGroupPage() {
             modifier = Modifier.scaffoldPadding(contentPadding)
         ) {
             items(
-                ruleSummary.slowGlobalGroups,
-                { (_, r) -> r.subsItem.id to r.group.key }
-            ) { (group, rule) ->
-                SlowGroupCard(
-                    modifier = Modifier
-                        .clickable(onClick = throttle {
-                            mainVm.navigatePage(
-                                SubsGlobalGroupListRoute(
-                                    rule.subsItem.id,
-                                    group.key
-                                )
-                            )
-                        })
-                        .itemPadding(),
-                    title = group.name,
-                    desc = "${rule.rawSubs.name}/全局规则"
-                )
-            }
-            items(
                 ruleSummary.slowAppGroups,
                 { (_, r) -> Triple(r.subsItem.id, r.appId, r.group.key) }
             ) { (group, rule) ->

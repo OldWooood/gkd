@@ -26,7 +26,6 @@ import li.songe.gkd.data.ResolvedRule
 import li.songe.gkd.isActivityVisible
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.service.OverlayWindowService
 import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.loc.Loc
@@ -43,7 +42,7 @@ fun toast(
         }
         return
     }
-    if (forced || isActivityVisible || OverlayWindowService.isAnyAlive) {
+    if (forced || isActivityVisible) {
         Toaster.show(text)
     }
     if (loc.isNotEmpty()) {

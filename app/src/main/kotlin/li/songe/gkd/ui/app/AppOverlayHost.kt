@@ -28,7 +28,6 @@ fun AppOverlayHost() {
         UiAutomationAlreadyRegisteredDlg()
         AccessRestrictedSettingsDlg()
         mainVm.dialogRequests.Render()
-        mainVm.githubUpload.Render()
         mainVm.updateStatus?.UpgradeDialog()
         mainVm.subsLinkDialog.Render()
         mainVm.ruleGroupState.Render()

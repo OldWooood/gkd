@@ -12,8 +12,7 @@ enum class AppNotificationChannel(
     val description: String? = null,
     val importance: Int = NotificationManager.IMPORTANCE_LOW,
 ) {
-    Service(id = "0"),
-    Snapshot(id = "1", label = "保存快照通知");
+    Service(id = "0");
 
     val displayName: String
         get() = label ?: META.appName

@@ -38,7 +38,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import li.songe.gkd.META
 import li.songe.gkd.ui.ActionLogRoute
 import li.songe.gkd.ui.SubsAppListRoute
-import li.songe.gkd.ui.SubsGlobalGroupListRoute
 import li.songe.gkd.ui.SubsSheetVm
 import li.songe.gkd.ui.share.LocalMainViewModel
 import li.songe.gkd.ui.style.EmptyHeight
@@ -202,41 +201,6 @@ class SubsSheetState {
                                     text = subsItem.mtimeStr,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        if (subscription.globalGroups.isNotEmpty() || subsItem.isLocal) {
-                            Row(
-                                modifier = Modifier
-                                    .clickable(onClickLabel = "查看全局规则列表", onClick = throttle {
-                                        closeImmediately()
-                                        mainVm.navigatePage(SubsGlobalGroupListRoute(subsItem.id))
-                                    })
-                                    .then(childModifier),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = "全局规则",
-                                        style = MaterialTheme.typography.labelLarge,
-                                    )
-                                    Text(
-                                        text = if (subscription.globalGroups.isNotEmpty()) "共 ${subscription.globalGroups.size} 全局规则" else "暂无",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.let {
-                                            if (subscription.globalGroups.isEmpty()) {
-                                                it.copy(alpha = 0.5f)
-                                            } else {
-                                                it
-                                            }
-                                        },
-                                    )
-                                }
-                                PerfIcon(
-                                    imageVector = PerfIcon.KeyboardArrowRight,
                                 )
                             }
                         }

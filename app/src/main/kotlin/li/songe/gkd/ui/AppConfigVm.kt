@@ -36,15 +36,13 @@ import li.songe.gkd.util.findOption
 import li.songe.gkd.util.toJson5String
 
 data class AppConfigUiState(
-    val globalSubsConfigs: List<SubsConfig>,
     val appSubsConfigs: List<SubsConfig>,
-    val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawGroupProps>>>,
+    val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawAppGroup>>>,
 )
 
 private data class AppConfigDatabaseState(
-    val globalSubsConfigs: List<SubsConfig>,
     val appSubsConfigs: List<SubsConfig>,
-    val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawGroupProps>>>,
+    val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawAppGroup>>>,
     val checkedGroupKeys: Set<Triple<Long, Int, Int>>,
 )
 
@@ -85,31 +83,20 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                 )
                 appUsedSubsIds to entries
             }.distinctUntilChanged().flatMapLatest { (usedSubsIds, entries) ->
-                combine(
-                    DbSet.subsConfigDao.queryUsedGlobalConfig(),
-                    DbSet.subsConfigDao.queryAppConfig(usedSubsIds, route.appId),
-                ) { globalConfigs, appConfigs ->
+                DbSet.subsConfigDao.queryAppConfig(usedSubsIds, route.appId).map { appConfigs ->
                     val subsPairs = entries.map { entry ->
-                        val globalGroups = entry.subscription.globalGroups.filter { group ->
-                            globalConfigs.find {
-                                it.subsId == entry.subsItem.id && it.groupKey == group.key
-                            }?.enable != false
-                        }
                         val appGroups = if (entry.subsItem.id in usedSubsIds) {
                             entry.subscription.getAppGroups(route.appId)
                         } else {
                             emptyList()
                         }
-                        entry to (globalGroups + appGroups)
+                        entry to appGroups
                     }.filter { it.second.isNotEmpty() }
 
                     val checkedGroupKeys = buildSet {
                         subsPairs.forEach { (entry, groups) ->
                             groups.forEach { group ->
-                                val subsConfig = when (group) {
-                                    is RawSubscription.RawAppGroup -> appConfigs
-                                    is RawSubscription.RawGlobalGroup -> globalConfigs
-                                }.find {
+                                val subsConfig = appConfigs.find {
                                     it.subsId == entry.subsItem.id && it.groupKey == group.key
                                 }
                                 val checked = getActualGroupChecked(
@@ -117,10 +104,7 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                                     group = group,
                                     appId = route.appId,
                                     subsConfig = subsConfig,
-                                ) && (
-                                    group !is RawSubscription.RawGlobalGroup ||
-                                        subsConfig?.enable != false
-                                    )
+                                )
                                 if (checked) {
                                     add(Triple(entry.subsItem.id, group.groupType, group.key))
                                 }
@@ -128,7 +112,6 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                         }
                     }
                     AppConfigDatabaseState(
-                        globalSubsConfigs = globalConfigs,
                         appSubsConfigs = appConfigs,
                         subsPairs = subsPairs,
                         checkedGroupKeys = checkedGroupKeys,
@@ -223,7 +206,6 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
         }
         Loadable.Ready(
             AppConfigUiState(
-                globalSubsConfigs = database.globalSubsConfigs,
                 appSubsConfigs = database.appSubsConfigs,
                 subsPairs = sortedPairs,
             )
@@ -271,7 +253,7 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
             MutableStateFlow<Triple<Long, String?, Int>?>(
                 Triple(
                     it.subsId,
-                    if (it.groupType == SubsConfig.AppGroupType) it.appId else null,
+                    it.appId,
                     it.groupKey,
                 )
             )

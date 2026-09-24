@@ -1,6 +1,5 @@
 package li.songe.gkd.notif
 
-import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
@@ -9,7 +8,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.net.toUri
 import li.songe.gkd.MainActivity
@@ -52,12 +50,6 @@ object NotificationDispatcher {
                 .addAction(0, "停止", stopIntent)
         }
         return builder.build()
-    }
-
-    fun post(notification: PostedNotification) {
-        if (!PermissionStates.notification.updateAndGet()) return
-        @SuppressLint("MissingPermission")
-        NotificationManagerCompat.from(app).notify(notification.id, build(notification))
     }
 
     private fun Service.canStartForeground(): Boolean {

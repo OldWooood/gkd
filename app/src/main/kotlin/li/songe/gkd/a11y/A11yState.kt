@@ -10,12 +10,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import li.songe.gkd.META
 import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.data.ActionLog
 import li.songe.gkd.data.ActionResult
-import li.songe.gkd.data.ActivityLog
 import li.songe.gkd.data.AttrInfo
 import li.songe.gkd.data.ResetMatchType
 import li.songe.gkd.data.ResolvedRule
@@ -69,10 +67,8 @@ private var lastValidActivity: TopActivity = topActivityFlow.value
         }
     }
 
-private var activityLogCount = 0
 private var lastActivityUpdateTime = 0L
 private var lastActivityForceUpdateTime = 0L
-private val tempActivityLogList = mutableListOf<ActivityLog>()
 
 private object ActivityCache : LruCache<Pair<String, String>, Boolean>(256) {
     override fun create(key: Pair<String, String>): Boolean = try {
@@ -102,11 +98,8 @@ class ActivityRule(
     val activityRules = if (blockMatch) emptyList() else appRules.filter { rule ->
         rule.matchActivity(topActivity.appId, topActivity.activityId)
     }
-    val globalRules = if (blockMatch) emptyList() else ruleSummary.globalRules.filter { r ->
-        r.matchActivity(topActivity.appId, topActivity.activityId)
-    }
 
-    val currentRules = (activityRules + globalRules).sortedBy { it.order }
+    val currentRules = activityRules.sortedBy { it.order }
     val hasPriorityRule = currentRules.size > 1 && currentRules.any { it.priorityEnabled }
     val activePriority: Boolean
         get() = hasPriorityRule && currentRules.any { it.isPriority() }
@@ -175,23 +168,6 @@ fun updateTopActivity(
     )
     lastValidActivity = oldActivity
     lastActivityUpdateTime = t
-    tempActivityLogList.add(
-        ActivityLog(
-            appId = appId,
-            activityId = activityId,
-            ctime = t,
-        )
-    )
-    if (tempActivityLogList.size >= 16 || appId == META.appId) {
-        val logs = tempActivityLogList.toTypedArray()
-        tempActivityLogList.clear()
-        appScope.launchTry {
-            DbSet.activityLogDao.insert(*logs)
-        }
-    }
-    if (activityLogCount++ % 100 == 0) {
-        appScope.launchTry { DbSet.activityLogDao.deleteKeepLatest() }
-    }
     val topActivity = topActivityFlow.value
     val ruleSummary = ruleSummaryFlow.value
     val topChanged = idChanged || oldActivityRule.topActivity != topActivity
@@ -204,11 +180,7 @@ fun updateTopActivity(
         if (idChanged) {
             val oldAppId = lastAppId
             lastAppId = appId
-            appScope.launchTry {
-                DbSet.appVisitLogDao.insert(oldAppId, appId, t)
-            }
             appChangeTime = t
-            ruleSummary.globalRules.forEach { it.resetState(t) }
             ruleSummary.appIdToRules[oldActivityRule.topActivity.appId]?.forEach { it.resetState(t) }
             newActivityRule.appRules.forEach { it.resetState(t) }
         } else {

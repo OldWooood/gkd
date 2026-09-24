@@ -54,7 +54,6 @@ import li.songe.gkd.service.StatusService
 import li.songe.gkd.service.TrackService
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.AboutRoute
-import li.songe.gkd.ui.AdvancedPageRoute
 import li.songe.gkd.ui.BlockA11yAppListRoute
 import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.component.CustomOutlinedTextField
@@ -520,9 +519,6 @@ fun useSettingsPage(): ScaffoldExt {
                 color = MaterialTheme.colorScheme.primary,
             )
 
-            SettingItem(title = "高级设置", onClick = {
-                mainVm.navigatePage(AdvancedPageRoute)
-            })
             SettingItem(title = "备份恢复", onClick = {
                 vm.setBackupDialogVisible(true)
             })

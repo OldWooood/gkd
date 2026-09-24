@@ -197,9 +197,7 @@ fun ActionLogPage(route: ActionLogRoute) {
                     )
                 } else if (actionLog.groupType == SubsConfig.GlobalGroupType) {
                     mainVm.navigatePage(
-                        SubsGlobalGroupListRoute(
-                            actionLog.subsId, actionLog.groupKey
-                        )
+                        SubsAppListRoute(actionLog.subsId)
                     )
                 }
             },
