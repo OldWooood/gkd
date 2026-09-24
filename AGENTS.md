@@ -17,7 +17,7 @@
 - 每次 Release 必须附带 `update.json`（应用内“检测更新”拉 `releases/latest/download/update.json`），字段：
   - `versionCode`/`versionName` 与本次版本一致；`downloadUrl` 填 APK 附件名（相对路径）；`fileSize` 填附件精确字节数；`changelog` 一句话；`versionLogs` 至少含本版 `{name, code, desc}`。
   - 上传：`gh release upload vX.Y.Z update.json`，上传后用 `curl -sL .../releases/latest/download/update.json` 验证。
-- 注意：推送 `v*` tag 会触发 `Build-Release` workflow（会再传一份包到同名 Release）；纯手动发版时留意是否与其撞车。
+- 本仓库无 GitHub Actions，`gh release create` 会自动建 tag 但不会触发任何构建。
 
 ## Kotlin 可见性
 
