@@ -460,10 +460,11 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             val nodeVal = (lastNode ?: getTimeoutActiveWindow()) ?: continue
             val rightAppId = nodeVal.packageName?.toString() ?: break
             val matchApp = rule.matchActivity(rightAppId)
-            if (topActivityFlow.value.appId != rightAppId || !matchApp) {
+            if (topActivityFlow.value.appId != rightAppId || (!matchApp && rule is AppRule)) {
                 scope.launch(eventDispatcher) { fixAppId(rightAppId) }
                 return
             }
+            if (!matchApp) continue
             val target = a11yContext.queryRule(rule, nodeVal) ?: continue
             if (rule.checkDelay() && rule.actionDelayJob.value == null) {
                 rule.actionDelayJob.value = scope.launch(actionDispatcher) {

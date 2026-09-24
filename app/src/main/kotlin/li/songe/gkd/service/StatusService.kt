@@ -160,7 +160,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
 private val defaultStatusNotification by lazy { NotificationCatalog.status() }
 
 private fun String.replaceTemplate(ruleSummary: RuleSummary, count: Long): String {
-    return replace($$"${i}", "0")
+    return replace($$"${i}", ruleSummary.globalGroups.size.toString())
         .replace($$"${k}", ruleSummary.appSize.toString())
         .replace($$"${u}", ruleSummary.appGroupSize.toString())
         .replace($$"${n}", count.toString())

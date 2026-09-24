@@ -92,6 +92,11 @@ fun useAppListPage(): ScaffoldExt {
     val searchStr = state.searchText
     val ruleSummary = state.ruleSummary
 
+    val globalDesc = if (ruleSummary.globalGroups.isNotEmpty()) {
+        "${ruleSummary.globalGroups.size}全局"
+    } else {
+        null
+    }
     val showSearchBar = state.showSearchBar
     val refreshing = state.refreshing
     val pullToRefreshState = rememberPullToRefreshState()
@@ -275,7 +280,7 @@ fun useAppListPage(): ScaffoldExt {
                     val desc = run {
                         if (editWhiteListMode) return@run null
                         val appGroups = ruleSummary.appIdToAllGroups[appInfo.id] ?: emptyList()
-                        if (appGroups.isNotEmpty()) {
+                        val appDesc = if (appGroups.isNotEmpty()) {
                             when (val disabledCount = appGroups.count { g -> !g.enable }) {
                                 0 -> "${appGroups.size}组规则"
                                 appGroups.size -> "${appGroups.size}组规则/${disabledCount}关闭"
@@ -285,6 +290,15 @@ fun useAppListPage(): ScaffoldExt {
                             }
                         } else {
                             null
+                        }
+                        if (globalDesc != null) {
+                            if (appDesc != null) {
+                                "$globalDesc/$appDesc"
+                            } else {
+                                globalDesc
+                            }
+                        } else {
+                            appDesc
                         }
                     }
                     AppItemCard(

@@ -98,8 +98,11 @@ class ActivityRule(
     val activityRules = if (blockMatch) emptyList() else appRules.filter { rule ->
         rule.matchActivity(topActivity.appId, topActivity.activityId)
     }
+    val globalRules = if (blockMatch) emptyList() else ruleSummary.globalRules.filter { r ->
+        r.matchActivity(topActivity.appId, topActivity.activityId)
+    }
 
-    val currentRules = activityRules.sortedBy { it.order }
+    val currentRules = (activityRules + globalRules).sortedBy { it.order }
     val hasPriorityRule = currentRules.size > 1 && currentRules.any { it.priorityEnabled }
     val activePriority: Boolean
         get() = hasPriorityRule && currentRules.any { it.isPriority() }
@@ -181,6 +184,7 @@ fun updateTopActivity(
             val oldAppId = lastAppId
             lastAppId = appId
             appChangeTime = t
+            ruleSummary.globalRules.forEach { it.resetState(t) }
             ruleSummary.appIdToRules[oldActivityRule.topActivity.appId]?.forEach { it.resetState(t) }
             newActivityRule.appRules.forEach { it.resetState(t) }
         } else {

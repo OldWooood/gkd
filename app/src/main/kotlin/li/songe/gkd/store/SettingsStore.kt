@@ -24,7 +24,7 @@ data class SettingsStore(
     val useSystemToast: Boolean = false,
     val useCustomNotifText: Boolean = false,
     val customNotifTitle: String = META.appName,
-    val customNotifText: String = $$"${k}应用/${u}规则/${n}触发",
+    val customNotifText: String = $$"${i}全局/${k}应用/${u}规则/${n}触发",
     val updateChannel: Int = if (META.isBeta) UpdateChannelOption.Beta.value else UpdateChannelOption.Stable.value,
     val appSort: Int = AppSortOption.ByUsedTime.value,
     val showBlockApp: Boolean = true,
