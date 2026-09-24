@@ -8,6 +8,17 @@
 
 - 用户明确要求提交或推送代码时，只执行必要的轻量核对与对应的 Git 操作；不得自动扩展为深度代码审查、临时 worktree 隔离验证、全量构建或测试、Release Gate、发布检查等重量级流程。只有用户明确要求对应检查时才允许执行。
 
+## 发布流程（手动发版，不依赖 CI）
+
+- 版本号在 `app/build.gradle.kts`：`versionCode + 1`，`versionName` 升 patch 位，独立 `chore: bump version to X.Y.Z` 提交。
+- `CHANGELOG.md` 顶部写本版条目，直接作为 Release notes；不含“更新方式”段落。
+- 本地签名打包：`./gradlew :app:assembleGkdRelease`（读根目录 `key.properties` + 本地 jks），产物 `app/build/outputs/apk/gkd/release/app-gkd-release.apk`。
+- 建 Release：`gh release create vX.Y.Z --title "Release vX.Y.Z" --notes-file CHANGELOG.md <apk>`。
+- 每次 Release 必须附带 `update.json`（应用内“检测更新”拉 `releases/latest/download/update.json`），字段：
+  - `versionCode`/`versionName` 与本次版本一致；`downloadUrl` 填 APK 附件名（相对路径）；`fileSize` 填附件精确字节数；`changelog` 一句话；`versionLogs` 至少含本版 `{name, code, desc}`。
+  - 上传：`gh release upload vX.Y.Z update.json`，上传后用 `curl -sL .../releases/latest/download/update.json` 验证。
+- 注意：推送 `v*` tag 会触发 `Build-Release` workflow（会再传一份包到同名 Release）；纯手动发版时留意是否与其撞车。
+
 ## Kotlin 可见性
 
 - `app` 模块内禁止使用 `internal` 关键字；由于没有其他模块会引用 `app` 模块，对外可见的声明应省略可见性修饰符（使用 Kotlin 默认的 `public`），仅在需要收窄作用域时使用 `private`。
