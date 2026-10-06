@@ -11,9 +11,7 @@ import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.data.SubsItem
 import li.songe.gkd.db.DbSet
-import li.songe.gkd.store.a11yScopeAppListFlow
 import li.songe.gkd.store.actionCountFlow
-import li.songe.gkd.store.blockA11yAppListFlow
 import li.songe.gkd.store.blockMatchAppListFlow
 import li.songe.gkd.store.storeFlow
 import java.io.File
@@ -38,8 +36,6 @@ object BackupUtils {
             storeFlow,
             actionCountFlow,
             blockMatchAppListFlow,
-            blockA11yAppListFlow,
-            a11yScopeAppListFlow,
         )
 
     suspend fun exportBackUpData(): File {

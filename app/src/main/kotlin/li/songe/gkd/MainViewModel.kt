@@ -4,9 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -18,16 +16,11 @@ import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.db.DbSet
 import li.songe.gkd.entry.EntryActivity
 import li.songe.gkd.entry.OpenFileActivity
-import li.songe.gkd.priv.AutomationService
-import li.songe.gkd.priv.privilegeContextFlow
-import li.songe.gkd.priv.uiAutomationFlow
 import li.songe.gkd.permission.PermissionRequests
 import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.service.A11yService
 import li.songe.gkd.store.createTextFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.PrivilegeServiceRoute
-import li.songe.gkd.ui.WebViewRoute
 import li.songe.gkd.ui.component.DialogRequests
 import li.songe.gkd.ui.component.RuleGroupState
 import li.songe.gkd.ui.component.ShareLogState
@@ -40,7 +33,6 @@ import li.songe.gkd.ui.home.HomeRoute
 import li.songe.gkd.ui.share.BaseViewModel
 import li.songe.gkd.ui.share.Loadable
 import li.songe.gkd.ui.share.ActivityResultRequests
-import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.BackupUtils
 import li.songe.gkd.util.DefaultSimpleLifeImpl
 import li.songe.gkd.util.LogUtils
@@ -50,8 +42,8 @@ import li.songe.gkd.util.ThrottleTimer
 import li.songe.gkd.util.UpdateStatus
 import li.songe.gkd.util.appIconMapFlow
 import li.songe.gkd.util.clearCache
-import li.songe.gkd.util.findOption
 import li.songe.gkd.util.launchTry
+import li.songe.gkd.util.openUri
 import li.songe.gkd.util.openWeChatScaner
 import li.songe.gkd.util.runMainPost
 import li.songe.gkd.util.toast
@@ -122,7 +114,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
         }
     }
 
-    fun navigateWebPage(url: String) = navigatePage(WebViewRoute(url))
+    fun openWebPage(url: String) = openUri(url)
 
     val dialogRequests = DialogRequests()
 
@@ -131,7 +123,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     val shareLog = ShareLogState(scope = scope)
 
     val subsLinkDialog = SubsLinkDialogState(
-        onOpenHelp = { navigateWebPage(ShortUrlSet.URL5) },
+        onOpenHelp = { openWebPage(ShortUrlSet.URL5) },
         requestLocalNetworkPermission = {
             permissionRequests.ensurePermissions(PermissionStates.localNetwork)
         },
@@ -252,48 +244,6 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
     private val a11yServicesFlow = useEnabledA11yServicesFlow()
     val a11yServiceEnabledFlow = useA11yServiceEnabledFlow(a11yServicesFlow)
-
-    val automatorModeFlow = storeFlow.mapNew {
-        AutomatorModeOption.objects.findOption(it.automatorMode)
-    }
-
-    private var updateAutomatorModeJob: Job? = null
-
-    private fun applyAutomatorMode(option: AutomatorModeOption) {
-        storeFlow.update { it.copy(automatorMode = option.value, enableAutomator = false) }
-        A11yService.instance?.shutdown()
-        uiAutomationFlow.value?.shutdown()
-    }
-
-    fun updateAutomatorMode(option: AutomatorModeOption) {
-        updateAutomatorModeJob?.cancel()
-        if (automatorModeFlow.value == option) return
-        if (
-            option != AutomatorModeOption.AutomationMode ||
-            privilegeContextFlow.value == null
-        ) {
-            applyAutomatorMode(option)
-            return
-        }
-        updateAutomatorModeJob = scope.launch {
-            val occupied = try {
-                withContext(Dispatchers.IO) {
-                    AutomationService.isOtherUiAutomationRunning()
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                toast("自动化状态检测失败：${e.message}")
-                LogUtils.d("detect automation state failed", e)
-                return@launch
-            }
-            if (occupied) {
-                AutomationService.showOccupiedWarning()
-                return@launch
-            }
-            applyAutomatorMode(option)
-        }
-    }
 
     init {
         // preload

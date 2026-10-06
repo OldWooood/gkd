@@ -6,8 +6,6 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.AccessibilityServiceInfoHidden
 import android.app.ActivityManager
 import android.app.TaskInfoHidden
-import android.app.UiAutomation
-import android.app.UiAutomationHidden
 import android.content.pm.PackageInfo
 import android.content.pm.PackageInfoHidden
 import android.view.KeyEvent
@@ -16,9 +14,6 @@ import android.view.MotionEvent
 import android.view.MotionEventHidden
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityNodeInfoHidden
-
-inline val UiAutomationHidden.toPublic get() = this as UiAutomation
-inline val UiAutomation.toHidden get() = this as UiAutomationHidden
 
 inline val AccessibilityNodeInfo.toHidden get() = this as AccessibilityNodeInfoHidden
 

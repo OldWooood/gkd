@@ -7,7 +7,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
-import li.songe.gkd.priv.uiAutomationOccupiedFlow
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.component.AppAlertDialog
@@ -25,7 +24,6 @@ fun AppOverlayHost() {
         mainVm.subsSheet.Render()
 
         // Dialog
-        UiAutomationAlreadyRegisteredDlg()
         AccessRestrictedSettingsDlg()
         mainVm.dialogRequests.Render()
         mainVm.updateStatus?.UpgradeDialog()
@@ -81,28 +79,6 @@ private fun AccessRestrictedSettingsDlg() {
                     Text(text = "关闭")
                 }
             },
-        )
-    }
-}
-
-@Composable
-private fun UiAutomationAlreadyRegisteredDlg() {
-    if (uiAutomationOccupiedFlow.collectAsStateWithLifecycle().value) {
-        AppAlertDialog(
-            onDismissRequest = {
-                uiAutomationOccupiedFlow.value = false
-            },
-            title = { Text(text = "启动失败") },
-            text = {
-                Text(text = "自动化服务启动失败，检测到自动化服务已被其他应用占用，请先关闭已有服务后重试\n\n注：自动化服务只能同时运行一个，请确保没有其他应用或测试框架占用后再启动")
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    uiAutomationOccupiedFlow.value = false
-                }) {
-                    Text(text = "我知道了")
-                }
-            }
         )
     }
 }

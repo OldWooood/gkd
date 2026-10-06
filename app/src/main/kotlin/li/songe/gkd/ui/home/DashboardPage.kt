@@ -43,13 +43,11 @@ import li.songe.gkd.priv.PrivilegeServiceStatus
 import li.songe.gkd.priv.privilegeServiceStatusFlow
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.service.StatusService
-import li.songe.gkd.service.a11yPartDisabledFlow
 import li.songe.gkd.service.switchAutomatorService
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.ActionLogRoute
 import li.songe.gkd.ui.AppConfigRoute
 import li.songe.gkd.ui.PrivilegeServiceRoute
-import li.songe.gkd.ui.WebViewRoute
 import li.songe.gkd.ui.component.GroupNameText
 import li.songe.gkd.ui.component.PerfIcon
 import li.songe.gkd.ui.component.PerfIconButton
@@ -77,7 +75,6 @@ fun useDashboardPage(): ScaffoldExt {
     val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
     val privilegeServiceStatus by privilegeServiceStatusFlow.collectAsStateWithLifecycle()
-    val automatorMode by mainVm.automatorModeFlow.collectAsStateWithLifecycle()
     val pageScrollState = rememberColumnScrollState()
     val scrollBehavior = pageScrollState.scrollBehavior
     val scrollState = pageScrollState.scrollState
@@ -156,11 +153,7 @@ fun useDashboardPage(): ScaffoldExt {
                 } else if (mainVm.a11yServiceEnabledFlow.collectAsStateWithLifecycle().value) {
                     "无障碍发生故障"
                 } else if (writeSecureSettings) {
-                    if (store.enableAutomator && a11yPartDisabledFlow.collectAsStateWithLifecycle().value) {
-                        "无障碍局部关闭"
-                    } else {
-                        "无障碍已关闭"
-                    }
+                    "无障碍已关闭"
                 } else {
                     "无障碍未授权"
                 },
@@ -172,7 +165,7 @@ fun useDashboardPage(): ScaffoldExt {
                         switchAutomatorService()
                     }
                 },
-                mode = automatorMode.label,
+                mode = "无障碍",
                 onModeClick = {
                     openA11ySettings()
                 },
@@ -214,7 +207,7 @@ fun useDashboardPage(): ScaffoldExt {
                 imageVector = PerfIcon.HelpOutline,
                 onClickLabel = "打开 GKD 文档页面",
                 onClick = {
-                    mainVm.navigatePage(WebViewRoute(initUrl = HOME_PAGE_URL))
+                    mainVm.openWebPage(HOME_PAGE_URL)
                 })
             Spacer(modifier = Modifier.height(EmptyHeight))
         }

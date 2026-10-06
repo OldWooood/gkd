@@ -1,7 +1,6 @@
 package li.songe.gkd.util
 
 import android.app.Service
-import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -125,6 +124,3 @@ fun <T : Service> startForegroundServiceByClass(clazz: KClass<T>) {
         toast("${prefix}启动服务失败: ${e.message}", forced = true)
     }
 }
-
-val Intent.extraCptName: ComponentName?
-    get() = getParcelableExtra(Intent.EXTRA_COMPONENT_NAME, ComponentName::class.java)

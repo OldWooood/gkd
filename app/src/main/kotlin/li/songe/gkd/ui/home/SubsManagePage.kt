@@ -2,9 +2,6 @@ package li.songe.gkd.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -43,9 +40,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import li.songe.gkd.R
 import li.songe.gkd.store.storeFlow
-import li.songe.gkd.ui.SlowGroupRoute
-import li.songe.gkd.ui.UpsertRuleGroupRoute
-import li.songe.gkd.ui.WebViewRoute
 import li.songe.gkd.ui.component.AnimationFloatingActionButton
 import li.songe.gkd.ui.component.AppAlertDialog
 import li.songe.gkd.ui.component.PerfIcon
@@ -69,7 +63,6 @@ import li.songe.gkd.util.UpdateTimeOption
 import li.songe.gkd.util.findOption
 import li.songe.gkd.util.getUpDownTransform
 import li.songe.gkd.util.launchTry
-import li.songe.gkd.util.ruleSummaryFlow
 import li.songe.gkd.util.throttle
 import li.songe.gkd.util.toast
 import sh.calvin.reorderable.ReorderableItem
@@ -120,7 +113,6 @@ private fun useLoadedSubsManagePage(
     val settingsDialogVisible by vm.settingsDialogVisibleFlow.collectAsStateWithLifecycle()
     val powerWarningItem by vm.powerWarningItemFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
-    val ruleSummary by ruleSummaryFlow.collectAsStateWithLifecycle()
     val subItems = state.subItems
     val subsIdToRaw = state.subscriptions
     val scope = vm.scope
@@ -173,7 +165,7 @@ private fun useLoadedSubsManagePage(
                         text = "查看耗电说明",
                         modifier = Modifier.clickable(onClick = throttle {
                             vm.dismissPowerWarning()
-                            mainVm.navigatePage(WebViewRoute(initUrl = ShortUrlSet.URL6))
+                            mainVm.openWebPage(ShortUrlSet.URL6)
                         }),
                         textDecoration = TextDecoration.Underline,
                         color = MaterialTheme.colorScheme.primary,
@@ -265,19 +257,6 @@ private fun useLoadedSubsManagePage(
                                 )
                             }
                         } else {
-                            AnimatedVisibility(
-                                visible = ruleSummary.slowGroupCount > 0,
-                                enter = scaleIn(),
-                                exit = scaleOut(),
-                            ) {
-                                PerfIconButton(
-                                    imageVector = PerfIcon.Eco,
-                                    contentDescription = "缓慢查询规则列表",
-                                    onClickLabel = "查看列表",
-                                    onClick = throttle {
-                                        mainVm.navigatePage(SlowGroupRoute)
-                                    })
-                            }
                             PerfIconButton(
                                 id = if (store.enableMatch) R.drawable.ic_flash_on else R.drawable.ic_flash_off,
                                 colors = IconButtonDefaults.iconButtonColors(
@@ -301,16 +280,18 @@ private fun useLoadedSubsManagePage(
                         }
                     }
                 }
-                PerfIconButton(
-                    imageVector = PerfIcon.MoreVert,
-                    contentDescription = "更多操作",
-                    onClick = {
-                        if (refreshing) {
-                            toast("正在刷新订阅，请稍后操作")
-                        } else {
-                            expanded = true
-                        }
-                    })
+                if (isSelectedMode) {
+                    PerfIconButton(
+                        imageVector = PerfIcon.MoreVert,
+                        contentDescription = "更多操作",
+                        onClick = {
+                            if (refreshing) {
+                                toast("正在刷新订阅，请稍后操作")
+                            } else {
+                                expanded = true
+                            }
+                        })
+                }
                 Box(
                     modifier = Modifier.wrapContentSize(Alignment.TopStart)
                 ) {
@@ -337,35 +318,6 @@ private fun useLoadedSubsManagePage(
                                         expanded = false
                                         selectionState.invert(subItems.map { it.id })
                                     }
-                                )
-                            } else {
-                                DropdownMenuItem(
-                                    text = { Text(text = "添加应用规则") },
-                                    onClick = throttle {
-                                        expanded = false
-                                        mainVm.navigatePage(
-                                            UpsertRuleGroupRoute(
-                                                subsId = LOCAL_SUBS_ID,
-                                                groupKey = null,
-                                                appId = "",
-                                                forward = true,
-                                            )
-                                        )
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = "添加全局规则") },
-                                    onClick = throttle {
-                                        expanded = false
-                                        mainVm.navigatePage(
-                                            UpsertRuleGroupRoute(
-                                                subsId = LOCAL_SUBS_ID,
-                                                groupKey = null,
-                                                appId = null,
-                                                forward = true,
-                                            )
-                                        )
-                                    },
                                 )
                             }
                         }

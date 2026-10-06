@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import li.songe.gkd.appScope
 import li.songe.gkd.util.AppListString
-import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.toast
 
@@ -31,44 +30,8 @@ val blockMatchAppListFlow by lazy {
     )
 }
 
-val blockA11yAppListFlow by lazy {
-    createTextFlow(
-        key = "block_a11y_app_list",
-        decode = { it?.let(AppListString::decode) ?: emptySet() },
-        encode = AppListString::encode,
-    )
-}
-
-val actualBlockA11yAppList: Set<String>
-    get() = if (storeFlow.value.blockA11yAppListFollowMatch) {
-        blockMatchAppListFlow.value
-    } else {
-        blockA11yAppListFlow.value
-    }
-
-val a11yScopeAppListFlow by lazy {
-    createTextFlow(
-        key = "a11y_scope_app_list",
-        decode = { it?.let(AppListString::decode) ?: setOf("com.tencent.mm") },
-        encode = AppListString::encode,
-    )
-}
-
-val actualA11yScopeAppList: Set<String>
-    get() = if (storeFlow.value.useAutomation) {
-        a11yScopeAppListFlow.value
-    } else {
-        emptySet()
-    }
-
 fun checkAppBlockMatch(appId: String): Boolean {
-    if (blockMatchAppListFlow.value.contains(appId)) {
-        return true
-    }
-    if (storeFlow.value.enableBlockA11yAppList) {
-        return actualBlockA11yAppList.contains(appId)
-    }
-    return false
+    return blockMatchAppListFlow.value.contains(appId)
 }
 
 fun initStore() = appScope.launchTry(Dispatchers.IO) {
@@ -76,12 +39,6 @@ fun initStore() = appScope.launchTry(Dispatchers.IO) {
     storeFlow.value
     actionCountFlow.value
     blockMatchAppListFlow.value
-    blockA11yAppListFlow.value
-    a11yScopeAppListFlow.value
-    if (!storeFlow.value.useA11y) {
-        // fork 只保留无障碍模式, 旧版本残留的自动化模式需强制迁回
-        storeFlow.update { it.copy(automatorMode = AutomatorModeOption.A11yMode.value) }
-    }
 }
 
 fun switchStoreEnableMatch() {

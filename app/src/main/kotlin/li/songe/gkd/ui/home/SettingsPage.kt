@@ -1,10 +1,6 @@
 package li.songe.gkd.ui.home
 
-import android.view.KeyEvent
 import androidx.activity.compose.LocalActivity
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,14 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -29,35 +19,24 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
 import li.songe.gkd.MainActivity
 import li.songe.gkd.R
-import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.priv.privilegeContextFlow
-import li.songe.gkd.service.StatusService
-import li.songe.gkd.service.TrackService
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.AboutRoute
-import li.songe.gkd.ui.BlockA11yAppListRoute
-import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.component.CustomOutlinedTextField
-import li.songe.gkd.ui.component.FullscreenDialog
 import li.songe.gkd.ui.component.AppAlertDialog
 import li.songe.gkd.ui.component.PerfCustomIconButton
 import li.songe.gkd.ui.component.PerfIcon
@@ -78,12 +57,10 @@ import li.songe.gkd.ui.style.titleItemPadding
 import li.songe.gkd.util.DarkThemeOption
 import li.songe.gkd.util.findOption
 import li.songe.gkd.util.launchTry
-import li.songe.gkd.util.openAppDetailsSettings
 import li.songe.gkd.util.saveFileToDownloads
 import li.songe.gkd.util.shareFile
 import li.songe.gkd.util.throttle
 import li.songe.gkd.util.toast
-import kotlin.time.Duration.Companion.milliseconds
 
 private const val ZIP_MIME_TYPE = "application/zip"
 
@@ -93,13 +70,10 @@ fun useSettingsPage(): ScaffoldExt {
     val context = LocalActivity.current as MainActivity
     val vm = viewModel<SettingsVm>()
     val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
-    val trackServiceRunning by TrackService.isRunning.collectAsStateWithLifecycle()
-    val privilegeAvailable = privilegeContextFlow.collectAsStateWithLifecycle().value != null
     val store by storeFlow.collectAsStateWithLifecycle()
     val actionScope = vm.scope
     val showToastInputDlg by vm.showActionToastDialogFlow.collectAsStateWithLifecycle()
     val showNotifTextInputDlg by vm.showNotificationTextDialogFlow.collectAsStateWithLifecycle()
-    val showA11yBlockDlg by vm.showA11yBlockDialogFlow.collectAsStateWithLifecycle()
     val showBackupDialog by vm.showBackupDialogFlow.collectAsStateWithLifecycle()
     val showExportBackupDialog by vm.showExportBackupDialogFlow.collectAsStateWithLifecycle()
     val showToastSettingsDialog by vm.toastSettingsDialogVisibleFlow.collectAsStateWithLifecycle()
@@ -123,32 +97,6 @@ fun useSettingsPage(): ScaffoldExt {
                 },
                 checked = store.useSystemToast,
                 onCheckedChange = vm::setUseSystemToast,
-            )
-            TextSwitch(
-                title = "轨迹提示",
-                subtitle = "显示触发位置信息",
-                checked = trackServiceRunning,
-                onCheckedChange = { enabled ->
-                    actionScope.launchTry {
-                        if (enabled) {
-                            if (!mainVm.dialogRequests.confirm(
-                                title = "使用须知",
-                                text = "开启「轨迹提示」后点击或滑动后会在屏幕上使用悬浮窗绘制轨迹(一段时间后消失)，如果新触摸事件恰好在悬浮窗区域内，可能会被目标应用拒绝，从而导致点击或滑动无响应",
-                                confirmText = "继续",
-                            )) return@launchTry
-                            if (
-                                !mainVm.permissionRequests.ensurePermissions(
-                                    PermissionStates.foregroundServiceSpecialUse,
-                                    PermissionStates.notification,
-                                    PermissionStates.drawOverlays,
-                                )
-                            ) {
-                                return@launchTry
-                            }
-                        }
-                        vm.setTrackServiceEnabled(enabled)
-                    }
-                },
             )
         }
     }
@@ -323,11 +271,6 @@ fun useSettingsPage(): ScaffoldExt {
     }
 
 
-    if (showA11yBlockDlg) {
-        BlockA11yDialog(
-            onDismissRequest = { vm.setA11yBlockDialogVisible(false) },
-        )
-    }
     if (showBackupDialog) {
         TextListDialog(
             onDismiss = { vm.setBackupDialogVisible(false) },
@@ -452,43 +395,6 @@ fun useSettingsPage(): ScaffoldExt {
                     }
                 })
 
-            var blockSectionVisible by remember {
-                mutableStateOf(store.enableBlockA11yAppList)
-            }
-            LaunchedEffect(store.enableBlockA11yAppList) {
-                delay(300.milliseconds)
-                blockSectionVisible = store.enableBlockA11yAppList
-            }
-            AnimatedVisibility(visible = blockSectionVisible) {
-                Text(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .titleItemPadding(),
-                    text = "无障碍",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            TextSwitch(
-                title = "局部关闭",
-                subtitle = "白名单内关闭服务",
-                checked = store.enableBlockA11yAppList && privilegeAvailable,
-                onCheckedChange = {
-                    if (it && !privilegeAvailable) {
-                        mainVm.navigatePage(PrivilegeServiceRoute)
-                    } else if (it) {
-                        vm.setA11yBlockDialogVisible(true)
-                    } else {
-                        vm.setBlockA11yAppListEnabled(false)
-                    }
-                },
-            )
-            AnimatedVisibility(visible = blockSectionVisible) {
-                SettingItem(title = "白名单", onClickLabel = "进入无障碍白名单页面", onClick = {
-                    mainVm.navigatePage(BlockA11yAppListRoute)
-                })
-            }
-
             Text(
                 text = "外观",
                 modifier = Modifier.titleItemPadding(),
@@ -532,179 +438,3 @@ fun useSettingsPage(): ScaffoldExt {
     }
 }
 
-@Composable
-private fun BlockA11yDialog(
-    onDismissRequest: () -> Unit,
-) {
-    val mainVm = LocalMainViewModel.current
-    val vm = viewModel<SettingsVm>()
-    val statusRunning by StatusService.isRunning.collectAsStateWithLifecycle()
-    val privilegeContext by privilegeContextFlow.collectAsStateWithLifecycle()
-    val ignoreBatteryOptimizations by PermissionStates.ignoreBatteryOptimizations.stateFlow.collectAsStateWithLifecycle()
-    val actionScope = vm.scope
-    val scrollState = rememberScrollState()
-    FullscreenDialog(onDismissRequest) {
-        Scaffold(
-            topBar = {
-                PerfTopAppBar(
-                    navigationIcon = {
-                        PerfIconButton(
-                            imageVector = PerfIcon.Close,
-                            onClickLabel = "关闭弹窗",
-                            onClick = onDismissRequest,
-                        )
-                    },
-                    title = {
-                        Text(text = "局部关闭")
-                    },
-                )
-            },
-            bottomBar = {
-                BottomAppBar {
-                    Spacer(modifier = Modifier.weight(1f))
-                    TextButton(
-                        enabled = privilegeContext != null && statusRunning && ignoreBatteryOptimizations,
-                        onClick = {
-                            actionScope.launchTry {
-                                onDismissRequest()
-                                delay(200.milliseconds)
-                                vm.setBlockA11yAppListEnabled(true)
-                            }
-                        }
-                    ) {
-                        Text(text = "继续")
-                    }
-                    Spacer(modifier = Modifier.width(itemHorizontalPadding))
-                }
-            },
-        ) { contentPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(contentPadding)
-                    .padding(horizontal = itemHorizontalPadding)
-            ) {
-                CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.bodyMedium) {
-                    Text(text = "「局部关闭」可在白名单应用内关闭服务，来解决界面异常，游戏掉帧或无障碍检测的问题")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "使用须知", style = MaterialTheme.typography.titleMedium)
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        RequiredTextItem(text = "切换服务会造成短暂触摸卡顿，请自行测试后再编辑白名单")
-                        RequiredTextItem(text = "使用其它无障碍应用可能导致优化无效，可在服务关闭后自行确认")
-                        RequiredTextItem(text = "必须确保服务关闭后的持续后台运行，否则会被系统暂停或结束运行导致重启失败")
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "使用条件", style = MaterialTheme.typography.titleMedium)
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        RequiredTextItem(
-                            text = "特权服务",
-                            enabled = privilegeContext == null,
-                            imageVector = if (privilegeContext != null) PerfIcon.Check else PerfIcon.ArrowForward,
-                            onClick = {
-                                mainVm.navigatePage(PrivilegeServiceRoute)
-                            },
-                        )
-                        RequiredTextItem(
-                            text = "开启「常驻通知」",
-                            enabled = !statusRunning,
-                            imageVector = if (statusRunning) PerfIcon.Check else PerfIcon.ArrowForward,
-                            onClick = {
-                                actionScope.launchTry {
-                                    StatusService.requestStart(mainVm)
-                                }
-                            },
-                        )
-                        RequiredTextItem(
-                            text = "省电策略设置为无限制",
-                            enabled = !ignoreBatteryOptimizations,
-                            imageVector = if (ignoreBatteryOptimizations) PerfIcon.Check else PerfIcon.ArrowForward,
-                            onClickLabel = "打开忽略电池优化设置页面",
-                            onClick = {
-                                actionScope.launchTry {
-                                    mainVm.permissionRequests.ensurePermissions(
-                                        PermissionStates.ignoreBatteryOptimizations,
-                                    )
-                                }
-                            },
-                        )
-                        RequiredTextItem(
-                            text = "(可选) 允许自启动",
-                            enabled = true,
-                            imageVector = PerfIcon.OpenInNew,
-                            onClickLabel = "打开应用详情页面",
-                            onClick = {
-                                openAppDetailsSettings()
-                            },
-                        )
-                        RequiredTextItem(
-                            text = "(可选) 在「最近任务」锁定",
-                            enabled = true,
-                            imageVector = PerfIcon.OpenInNew,
-                            onClickLabel = "打开应用详情页面",
-                            onClick = {
-                                val privilegeContext = privilegeContextFlow.value
-                                if (privilegeContext == null) {
-                                    mainVm.navigatePage(PrivilegeServiceRoute)
-                                } else {
-                                    privilegeContext.keyevent(KeyEvent.KEYCODE_APP_SWITCH)
-                                }
-                            },
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "某些场景下服务刚启动时概率不工作，如多次遇到此情况则不建议使用此功能")
-                }
-                Spacer(modifier = Modifier.height(EmptyHeight))
-            }
-        }
-    }
-}
-
-@Composable
-private fun RequiredTextItem(
-    text: String,
-    imageVector: ImageVector? = null,
-    enabled: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    onClickLabel: String? = null,
-) {
-    Row(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .run {
-                if (onClick != null) {
-                    clickable(
-                        enabled = enabled,
-                        onClick = throttle(onClick),
-                        onClickLabel = onClickLabel
-                    )
-                } else {
-                    this
-                }
-            }
-            .padding(horizontal = 4.dp),
-    ) {
-        val lineHeightDp = LocalDensity.current.run { LocalTextStyle.current.lineHeight.toDp() }
-        Spacer(
-            modifier = Modifier
-                .padding(vertical = (lineHeightDp - 4.dp) / 2)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.tertiary)
-                .size(4.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = text)
-        if (imageVector != null) {
-            PerfIcon(
-                imageVector = imageVector,
-                modifier = Modifier.iconTextSize(),
-            )
-        }
-    }
-
-}

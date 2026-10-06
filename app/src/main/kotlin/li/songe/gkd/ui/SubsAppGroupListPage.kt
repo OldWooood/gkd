@@ -29,7 +29,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
-import li.songe.gkd.ui.component.AnimationFloatingActionButton
 import li.songe.gkd.ui.component.BatchActionButtonGroup
 import li.songe.gkd.ui.component.EmptyText
 import li.songe.gkd.ui.component.PerfIcon
@@ -232,23 +231,6 @@ fun SubsAppGroupListPage(route: SubsAppGroupListRoute) {
                     }
                 }
             })
-        }, floatingActionButton = {
-            if (editable) {
-                AnimationFloatingActionButton(
-                    visible = !isSelectedMode,
-                    onClick = {
-                        mainVm.navigatePage(
-                            UpsertRuleGroupRoute(
-                                subsId = subsItemId,
-                                groupKey = null,
-                                appId = appId
-                            )
-                        )
-                    },
-                    contentDescription = "添加规则",
-                    imageVector = PerfIcon.Add,
-                )
-            }
         }) { contentPadding ->
             LazyColumn(
                 modifier = Modifier.scaffoldPadding(contentPadding),

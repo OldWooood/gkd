@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,7 +48,6 @@ import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.scaffoldPadding
 import li.songe.gkd.util.AppGroupOption
 import li.songe.gkd.util.AppSortOption
-import li.songe.gkd.util.LOCAL_SUBS_IDS
 import li.songe.gkd.util.appInfoMapFlow
 import li.songe.gkd.util.findOption
 import li.songe.gkd.util.launchTry
@@ -187,24 +185,6 @@ fun SubsAppListPage(route: SubsAppListRoute) {
                     }
                 }
             })
-        },
-        floatingActionButton = {
-            if (LOCAL_SUBS_IDS.contains(subsItemId)) {
-                FloatingActionButton(onClick = throttle {
-                    mainVm.navigatePage(
-                        UpsertRuleGroupRoute(
-                            subsId = subsItemId,
-                            groupKey = null,
-                            appId = "",
-                            forward = true,
-                        )
-                    )
-                }) {
-                    PerfIcon(
-                        imageVector = PerfIcon.Add,
-                    )
-                }
-            }
         },
     ) { contentPadding ->
         LazyColumn(

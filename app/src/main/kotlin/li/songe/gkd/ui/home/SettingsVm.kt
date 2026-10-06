@@ -7,8 +7,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
-import li.songe.gkd.service.TrackService
-import li.songe.gkd.service.fixRestartAutomatorService
 import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.share.BaseViewModel
@@ -23,8 +21,6 @@ class SettingsVm : BaseViewModel() {
         field = MutableStateFlow(false)
     val showNotificationTextDialogFlow: StateFlow<Boolean>
         field = MutableStateFlow(false)
-    val showA11yBlockDialogFlow: StateFlow<Boolean>
-        field = MutableStateFlow(false)
     val showBackupDialogFlow: StateFlow<Boolean>
         field = MutableStateFlow(false)
     val showExportBackupDialogFlow: StateFlow<Boolean>
@@ -38,10 +34,6 @@ class SettingsVm : BaseViewModel() {
 
     fun setNotificationTextDialogVisible(visible: Boolean) {
         showNotificationTextDialogFlow.value = visible
-    }
-
-    fun setA11yBlockDialogVisible(visible: Boolean) {
-        showA11yBlockDialogFlow.value = visible
     }
 
     fun setBackupDialogVisible(visible: Boolean) {
@@ -86,23 +78,12 @@ class SettingsVm : BaseViewModel() {
         storeFlow.update { it.copy(useSystemToast = enabled) }
     }
 
-    fun setTrackServiceEnabled(enabled: Boolean) {
-        if (enabled) TrackService.start() else TrackService.stop()
-    }
-
     fun setUseCustomNotificationText(enabled: Boolean) {
         storeFlow.update { it.copy(useCustomNotifText = enabled) }
     }
 
     fun setExcludeFromRecents(enabled: Boolean) {
         storeFlow.update { it.copy(excludeFromRecents = enabled) }
-    }
-
-    fun setBlockA11yAppListEnabled(enabled: Boolean) {
-        storeFlow.update { it.copy(enableBlockA11yAppList = enabled) }
-        if (!enabled) {
-            fixRestartAutomatorService()
-        }
     }
 
     fun setDarkTheme(value: Boolean?) {

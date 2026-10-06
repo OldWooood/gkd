@@ -27,7 +27,6 @@ import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.service.StatusService
 import li.songe.gkd.service.fixRestartAutomatorService
-import li.songe.gkd.service.updateTopTaskAppId
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.share.ActivityImeController
 import li.songe.gkd.ui.share.ActivityResultRequests
@@ -71,9 +70,6 @@ class MainActivity : ComponentActivity() {
             intent = null
         }
         StatusService.autoStart()
-        if (storeFlow.value.enableBlockA11yAppList) {
-            updateTopTaskAppId(META.appId)
-        }
         setContent {
             CompositionLocalProvider(
                 LocalMainViewModel provides mainVm,

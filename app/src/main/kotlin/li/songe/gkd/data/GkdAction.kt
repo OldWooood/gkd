@@ -10,7 +10,6 @@ import li.songe.gkd.a11y.A11yRuleEngine
 import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.priv.toHidden
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.service.TrackService
 import li.songe.gkd.util.ScreenUtils
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -42,7 +41,6 @@ sealed class ActionPerformer(val action: String) {
             node: AccessibilityNodeInfo,
             locationProps: RawSubscription.LocationProps,
         ): ActionResult {
-            TrackService.addA11yNodePosition(node)
             return ActionResult(
                 action = action,
                 result = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
@@ -66,7 +64,6 @@ sealed class ActionPerformer(val action: String) {
                     position = x to y,
                 )
             }
-            TrackService.addXyPosition(x, y)
             return ActionResult(
                 action = action,
                 result = if (
@@ -111,7 +108,6 @@ sealed class ActionPerformer(val action: String) {
             node: AccessibilityNodeInfo,
             locationProps: RawSubscription.LocationProps,
         ): ActionResult {
-            TrackService.addA11yNodePosition(node)
             return ActionResult(
                 action = action,
                 result = node.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK).apply {
@@ -141,7 +137,6 @@ sealed class ActionPerformer(val action: String) {
                     position = x to y,
                 )
             }
-            TrackService.addXyPosition(x, y)
             return ActionResult(
                 action = action,
                 result = if (
@@ -238,7 +233,6 @@ sealed class ActionPerformer(val action: String) {
                     position = endX to endY,
                 )
             }
-            TrackService.addSwipePosition(startX, startY, endX, endY, swipeArg.duration)
             return if (
                 privilegeContextFlow.value?.swipe(
                     startX,

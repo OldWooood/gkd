@@ -20,7 +20,6 @@ import li.songe.gkd.data.ResolvedRule
 import li.songe.gkd.data.RuleStatus
 import li.songe.gkd.data.isSystem
 import li.songe.gkd.db.DbSet
-import li.songe.gkd.service.updateTopTaskAppId
 import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.checkAppBlockMatch
 import li.songe.gkd.util.LogUtils
@@ -142,9 +141,6 @@ fun updateTopActivity(
     @Loc loc: String = "",
 ) {
     val t = System.currentTimeMillis()
-    if (scene == ActivityScene.TaskStack) {
-        updateTopTaskAppId(appId)
-    }
     val oldActivity = topActivityFlow.value
     val oldActivityRule = activityRuleFlow.value
     val idChanged = (scene == ActivityScene.ScreenOn || appId != oldActivityRule.topActivity.appId)

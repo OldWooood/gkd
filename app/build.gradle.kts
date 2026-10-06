@@ -301,9 +301,4 @@ dependencies {
 
     implementation(libs.json5)
     compileOnly(libs.loc.annotation)
-
-    // compose-webview declares Material but does not use it.
-    implementation(libs.kevinnzouWebview) {
-        exclude(group = "com.google.android.material", module = "material")
-    }
 }

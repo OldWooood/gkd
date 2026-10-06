@@ -9,10 +9,6 @@ import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.service.StatusService
-import li.songe.gkd.service.currentAppBlocked
-import li.songe.gkd.service.currentAppUseA11y
-import li.songe.gkd.service.updateTopTaskAppId
-import li.songe.gkd.store.storeFlow
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.toast
@@ -31,7 +27,6 @@ private val userServiceSpec = PrivilegeUserServiceSpec(
 
 private suspend fun clearPrivilegeContext(context: PrivilegeContext) {
     if (!privilegeContextFlow.compareAndSet(context, null)) return
-    uiAutomationFlow.value?.shutdown(true)
     try {
         context.destroy()
     } catch (e: CancellationException) {
@@ -57,16 +52,6 @@ private suspend fun updatePrivilegeContext(serverInfo: PrivilegeServerInfo?) =
             val userServiceConnection = Privilege.bindUserService(userServiceSpec)
             val privilegeContext = PrivilegeContext.create(serverInfo, userServiceConnection)
             privilegeContextFlow.value = privilegeContext
-            privilegeContext.topCpn()?.let { cpn ->
-                updateTopTaskAppId(cpn.packageName)
-            }
-            if (
-                storeFlow.value.useAutomation &&
-                !currentAppBlocked &&
-                !currentAppUseA11y
-            ) {
-                AutomationService.tryConnect(true)
-            }
             PermissionStates.refreshAll()
             if (StatusService.needRestart) {
                 privilegeContext.startForegroundService(

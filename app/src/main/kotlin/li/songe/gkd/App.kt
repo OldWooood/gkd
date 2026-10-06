@@ -32,7 +32,6 @@ import li.songe.gkd.data.selfAppInfo
 import li.songe.gkd.notif.NotificationChannels
 import li.songe.gkd.priv.gkdPrivilegeUiConfig
 import li.songe.gkd.priv.initPrivilege
-import li.songe.gkd.service.initA11yWhiteAppList
 import li.songe.gkd.store.initStore
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.PKG_FLAGS
@@ -231,7 +230,6 @@ class App : Application() {
         appScope.launchTry(Dispatchers.IO) {
             SubscriptionStore.initialize()
         }
-        initA11yWhiteAppList()
         syncFixState()
     }
 }

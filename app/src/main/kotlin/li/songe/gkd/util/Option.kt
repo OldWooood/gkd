@@ -152,10 +152,9 @@ sealed class AutomatorModeOption(
     override val options get() = objects
 
     data object A11yMode : AutomatorModeOption(1, "无障碍")
-    data object AutomationMode : AutomatorModeOption(2, "自动化")
 
     companion object {
-        val objects by lazy { listOf(A11yMode, AutomationMode) }
+        val objects by lazy { listOf(A11yMode) }
     }
 }
 

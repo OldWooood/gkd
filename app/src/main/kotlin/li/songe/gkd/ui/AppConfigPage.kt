@@ -41,7 +41,6 @@ import li.songe.gkd.data.ActionLog
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.component.AnimatedBooleanContent
-import li.songe.gkd.ui.component.AnimationFloatingActionButton
 import li.songe.gkd.ui.component.AppNameText
 import li.songe.gkd.ui.component.BatchActionButtonGroup
 import li.songe.gkd.ui.component.EmptyText
@@ -65,7 +64,6 @@ import li.songe.gkd.ui.share.noRippleClickable
 import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.iconTextSize
 import li.songe.gkd.ui.style.scaffoldPadding
-import li.songe.gkd.util.LOCAL_SUBS_ID
 import li.songe.gkd.util.RuleSortOption
 import li.songe.gkd.util.copyText
 import li.songe.gkd.util.findOption
@@ -279,22 +277,6 @@ fun AppConfigPage(route: AppConfigRoute) {
                     }
                 }
             })
-        },
-        floatingActionButton = {
-            AnimationFloatingActionButton(
-                visible = !isSelectedMode,
-                onClick = {
-                    mainVm.navigatePage(
-                        UpsertRuleGroupRoute(
-                            subsId = LOCAL_SUBS_ID,
-                            groupKey = null,
-                            appId = appId
-                        )
-                    )
-                },
-                imageVector = PerfIcon.Add,
-                contentDescription = "添加规则"
-            )
         },
     ) { contentPadding ->
         LazyColumn(

@@ -22,7 +22,6 @@ import li.songe.gkd.store.storeFlow
 import li.songe.gkd.util.DefaultSimpleLifeImpl
 import li.songe.gkd.util.OnSimpleLife
 import li.songe.gkd.util.RuleSummary
-import li.songe.gkd.util.appInfoMapFlow
 import li.songe.gkd.util.getSubsStatus
 import li.songe.gkd.util.ruleSummaryFlow
 import li.songe.gkd.util.startForegroundServiceByClass
@@ -55,13 +54,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
             val text = if (a11yServiceEnabledFlow.value) {
                 "无障碍发生故障"
             } else if (PermissionStates.writeSecureSettings.updateAndGet()) {
-                if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
-                    val name =
-                        appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
-                    "局部关闭 · $name"
-                } else {
-                    "无障碍已关闭"
-                }
+                "无障碍已关闭"
             } else {
                 "无障碍未授权"
             }
@@ -96,7 +89,6 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                     a11yServiceEnabledFlow,
                     PermissionStates.writeSecureSettings.stateFlow,
                     PermissionStates.appOpsRestrictedFlow,
-                    topAppIdFlow,
                     actionCountFlow.debounce(1000L.milliseconds),
                 ) {
                     statusTriple()

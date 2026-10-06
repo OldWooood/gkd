@@ -1,14 +1,12 @@
 package li.songe.gkd.a11y
 
 import android.accessibilityservice.AccessibilityService
-import android.graphics.Bitmap
 import android.util.Log
 import android.view.Display
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -27,14 +25,9 @@ import li.songe.gkd.data.RpcError
 import li.songe.gkd.data.RuleStatus
 import li.songe.gkd.isActivityVisible
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.service.topAppIdFlow
 import li.songe.gkd.priv.privilegeContextFlow
-import li.songe.gkd.priv.uiAutomationFlow
-import li.songe.gkd.store.actualBlockA11yAppList
 import li.songe.gkd.store.storeFlow
-import li.songe.gkd.util.AutomatorModeOption
 import li.songe.gkd.util.launchTry
-import li.songe.gkd.util.runMainPost
 import li.songe.gkd.util.showActionToast
 import li.songe.gkd.util.systemUiAppId
 import li.songe.selector.MatchOptions
@@ -61,33 +54,12 @@ private val idleEventDeliveryTimeout: Long
         IDLE_EVENT_DELIVERY_TIMEOUT
     }
 
-private val latestServiceMode = atomic(0)
-private val latestServiceTime = atomic(0L)
-
 class A11yRuleEngine(val service: A11yCommonImpl) {
     private val a11yContext = A11yContext(this)
-    private val effective get() = latestServiceMode.value == service.mode.value
-    private val hasOthersService = when (service.mode) {
-        AutomatorModeOption.A11yMode -> uiAutomationFlow.value != null
-        AutomatorModeOption.AutomationMode -> A11yService.instance != null
-    }
 
     fun onA11yConnected() {
-        val serviceTime = System.currentTimeMillis()
-        latestServiceMode.value = service.mode.value
-        latestServiceTime.value = serviceTime
         refreshEventDeliveryTimeout()
-        if (storeFlow.value.enableBlockA11yAppList && !actualBlockA11yAppList.contains(topAppIdFlow.value)) {
-            startQueryJob(byForced = true)
-        }
-        runMainPost(1000L) {// 共存 1000ms, 等待另一个服务稳定
-            if (latestServiceTime.value == serviceTime) {
-                when (service.mode) {
-                    AutomatorModeOption.A11yMode -> uiAutomationFlow.value?.shutdown(true)
-                    AutomatorModeOption.AutomationMode -> A11yService.instance?.shutdown(true)
-                }
-            }
-        }
+        startQueryJob(byForced = true)
     }
 
     fun onScreenForcedActive() {
@@ -105,7 +77,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     }
 
     fun onTopActivityChanged(idChanged: Boolean) {
-        if (!effective) return
         scope.launch(actionDispatcher) {
             refreshEventDeliveryTimeout()
             if (idChanged) {
@@ -136,7 +107,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     private var lastEventTime = 0L
     private val eventDeque = ArrayDeque<A11yEvent>()
     fun onA11yEvent(event: AccessibilityEvent?) {
-        if (!effective) return
         if (!event.isUseful()) return
         // 拒绝副屏无障碍事件
         if (event.displayId != Display.DEFAULT_DISPLAY) return
@@ -259,12 +229,11 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         byForced: Boolean = false,
         byDelayRule: ResolvedRule? = null,
     ) {
-        if (!effective) return
         if (!storeFlow.value.enableMatch) return
         if (activityRuleFlow.value.currentRules.isEmpty()) return
         if (querying) return
         // 无障碍从零启动时获取 safeActiveWindow 非常耗时
-        if (byEvent == null && service.justStarted && !hasOthersService) return checkFutureStartJob()
+        if (byEvent == null && service.justStarted) return checkFutureStartJob()
         scope.launchTry(queryDispatcher) {
             querying = true
             val st = if (META.debuggable) System.currentTimeMillis() else 0L
@@ -437,7 +406,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             }
         }
         for (rule in activityRule.priorityRules) { // 规则数量有可能过多导致耗时过长
-            if (!effective) return
             if (checkOutDate(activityRule, tempStateEvent)) break
             if (delayRule != null && delayRule !== rule) continue
             if (rule.status != RuleStatus.StatusOk) continue
@@ -505,9 +473,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
 
     companion object {
         val service: A11yCommonImpl?
-            get() = uiAutomationFlow.value?.takeIf {
-                it.mode.value == latestServiceMode.value
-            } ?: A11yService.instance
+            get() = A11yService.instance
         val instance: A11yRuleEngine? get() = service?.ruleEngine
 
         fun compatWindows(): List<AccessibilityWindowInfo> {
@@ -527,8 +493,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             if (r1 == true) return true
             return A11yService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true
         }
-
-        suspend fun screenshot(): Bitmap? = service?.screenshot()
 
         suspend fun execAction(gkdAction: GkdAction): ActionResult {
             val selectorResult = Selector.compile(gkdAction.selector)

@@ -1,14 +1,10 @@
 package li.songe.gkd.priv
 
 import android.Manifest
-import android.accessibilityservice.AccessibilityServiceInfo
-import android.accessibilityservice.IAccessibilityServiceClient
 import android.app.AppOpsManager
 import android.app.AppOpsManagerHidden
 import android.content.Intent
 import android.content.pm.PackageInfo
-import android.graphics.Bitmap
-import android.os.IBinder
 import android.os.Process
 import com.hjq.permissions.permission.dangerous.GetInstalledAppsPermission
 import li.songe.gkd.META
@@ -30,7 +26,6 @@ class PrivilegeContext private constructor(
     private val activityManager = CompatActivityManager()
     private val appOpsService = CompatAppOpsService()
     private val inputManager = CompatInputManager()
-    private val a11yManager = CompatAccessibilityManager()
     private val wmManager = CompatWindowManager()
     private var taskStackListenerRegistered = false
 
@@ -104,22 +99,6 @@ class PrivilegeContext private constructor(
         return inputManager.keyevent(keyCode)
     }
 
-    fun registerUiTestAutomationService(
-        owner: IBinder,
-        client: IAccessibilityServiceClient,
-        info: AccessibilityServiceInfo,
-        userId: Int,
-        flags: Int,
-    ) {
-        a11yManager.registerUiTestAutomationService(owner, client, info, userId, flags)
-    }
-
-    fun unregisterUiTestAutomationService(client: IAccessibilityServiceClient) {
-        a11yManager.value.unregisterUiTestAutomationService(client)
-    }
-
-    fun isUiAutomationRunning(): Boolean = a11yManager.isUiAutomationRunning()
-
     fun isRotationFrozen(): Boolean = wmManager.value.isRotationFrozen
 
     fun getDefaultDisplayRotation(): Int = wmManager.value.defaultDisplayRotation
@@ -130,10 +109,6 @@ class PrivilegeContext private constructor(
 
     fun thawRotation(caller: String) {
         wmManager.thawRotation(caller)
-    }
-
-    fun screenshot(): Bitmap? {
-        return CompatScreenshot.capture(app, wmManager.value)
     }
 
     private fun setAllowSelfMode(code: Int) {

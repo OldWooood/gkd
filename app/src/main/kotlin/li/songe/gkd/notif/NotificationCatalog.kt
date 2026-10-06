@@ -3,7 +3,6 @@ package li.songe.gkd.notif
 import android.app.Service
 import li.songe.gkd.META
 import li.songe.gkd.R
-import li.songe.gkd.service.TrackService
 import kotlin.reflect.KClass
 
 enum class ForegroundNotificationKey(
@@ -11,7 +10,6 @@ enum class ForegroundNotificationKey(
     val channel: AppNotificationChannel = AppNotificationChannel.Service,
 ) {
     Status(id = 100),
-    Track(id = 108),
 }
 
 sealed interface AppNotificationSpec {
@@ -55,12 +53,5 @@ object NotificationCatalog {
         title = title,
         text = text,
         uri = uri,
-    )
-
-    fun track() = ForegroundNotification(
-        key = ForegroundNotificationKey.Track,
-        title = "轨迹服务正在运行",
-        uri = "gkd://page?tab=3",
-        stopService = TrackService::class,
     )
 }

@@ -148,7 +148,7 @@ fun AboutPage() {
                     imageVector = null,
                     title = "捐赠支持",
                     onClick = {
-                        mainVm.navigateWebPage(ShortUrlSet.URL10)
+                        mainVm.openWebPage(ShortUrlSet.URL10)
                     },
                 )
             }
@@ -156,14 +156,14 @@ fun AboutPage() {
                 imageVector = null,
                 title = "使用协议",
                 onClick = {
-                    mainVm.navigateWebPage(ShortUrlSet.URL12)
+                    mainVm.openWebPage(ShortUrlSet.URL12)
                 },
             )
             SettingItem(
                 imageVector = null,
                 title = "隐私政策",
                 onClick = {
-                    mainVm.navigateWebPage(ShortUrlSet.URL11)
+                    mainVm.openWebPage(ShortUrlSet.URL11)
                 },
             )
 
