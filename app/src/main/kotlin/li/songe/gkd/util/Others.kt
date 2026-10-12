@@ -33,12 +33,11 @@ import li.songe.json5.Json5EncoderConfig
 import li.songe.json5.encodeToJson5String
 import java.io.File
 import kotlin.reflect.KClass
-import kotlin.reflect.jvm.jvmName
 
 private val componentNameCache by lazy { HashMap<String, ComponentName>() }
 
 val KClass<*>.componentName
-    get() = componentNameCache.getOrPut(jvmName) { ComponentName(META.appId, jvmName) }
+    get() = java.name.let { name -> componentNameCache.getOrPut(name) { ComponentName(META.appId, name) } }
 
 fun Bitmap.isFullTransparent(): Boolean {
     repeat(width) { x ->

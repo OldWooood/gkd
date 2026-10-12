@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import li.songe.gkd.a11y.selectorTypeModel
-import li.songe.gkd.util.LOCAL_SUBS_IDS
+import li.songe.gkd.util.LOCAL_SUBS_ID
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.ScreenUtils
 import li.songe.gkd.util.appInfoMapFlow
@@ -56,59 +56,10 @@ data class RawSubscription(
         return Objects.hash(id, name, version)
     }
 
-    val isEmpty: Boolean
-        get() = globalGroups.isEmpty() && apps.all { it.groups.isEmpty() } && categories.isEmpty()
-
     val isLocal: Boolean
-        get() = LOCAL_SUBS_IDS.contains(id)
+        get() = id == LOCAL_SUBS_ID
 
     val hasRule get() = globalGroups.isNotEmpty() || apps.any { it.groups.isNotEmpty() }
-
-    fun getSafeCategory(key: Int): RawCategory {
-        return categories.find { it.key == key } ?: RawCategory(
-            key = key,
-            name = key.toString(),
-            enable = false,
-            desc = null
-        )
-    }
-
-    private val categoryAppsMap: Map<Int, List<RawApp>> by lazy {
-        val map = mutableMapOf<Int, MutableList<RawApp>>()
-        val usedGroups = mutableListOf<RawAppGroup>()
-        categories.forEach { c ->
-            apps.forEach { a ->
-                val subGroups = a.groups.filter { g ->
-                    g.name.startsWith(c.name) && !usedGroups.any { g2 -> g2 === g }
-                }
-                if (subGroups.isNotEmpty()) {
-                    usedGroups.addAll(subGroups)
-                    val list = map[c.key]
-                    val b = a.copy(groups = subGroups)
-                    if (list == null) {
-                        map[c.key] = mutableListOf(b)
-                    } else {
-                        list.add(b)
-                    }
-                }
-            }
-        }
-        map
-    }
-
-    private val categoryGroupsMap: Map<Int, List<RawAppGroup>> by lazy {
-        categoryAppsMap.mapValues { (key, apps) ->
-            apps.flatMap { it.groups }
-        }
-    }
-
-    fun getCategoryApps(categoryKey: Int): List<RawApp> {
-        return categoryAppsMap[categoryKey] ?: emptyList()
-    }
-
-    fun getCategory(groupName: String): RawCategory? {
-        return categories.find { c -> groupName.startsWith(c.name) }
-    }
 
     fun getAppGroups(appId: String): List<RawAppGroup> {
         return apps.find { a -> a.id == appId }?.groups ?: emptyList()
@@ -120,20 +71,6 @@ data class RawSubscription(
             name = appInfoMapFlow.value[appId]?.name,
             groups = emptyList()
         )
-    }
-
-    fun getAppByGroup(group: RawAppGroup): RawApp {
-        return apps.find { a -> a.groups.any { g -> g === group } }
-            ?: throw IllegalStateException("App not found for group ${group.name}")
-    }
-
-    fun getCategoryCompatDesc(categoryKey: Int): String? {
-        val c = getSafeCategory(categoryKey)
-        if (!c.desc.isNullOrBlank()) return c.desc
-        val groupSize = categoryGroupsMap[categoryKey]?.size ?: 0
-        val appSize = categoryAppsMap[categoryKey]?.size ?: 0
-        if (groupSize > 0) return "${appSize}应用/${groupSize}规则"
-        return null
     }
 
     val appGroups by lazy {
@@ -322,8 +259,6 @@ data class RawSubscription(
         val actionMaximumKey: Int?
         val order: Int?
         val forcedTime: Long?
-        val snapshotUrls: List<String>?
-        val excludeSnapshotUrls: List<String>?
         val exampleUrls: List<String>?
         val priorityTime: Long?
         val priorityActionMaximum: Int?
@@ -429,8 +364,6 @@ data class RawSubscription(
         override val priorityActionMaximum: Int?,
         override val order: Int?,
         override val forcedTime: Long?,
-        override val snapshotUrls: List<String>?,
-        override val excludeSnapshotUrls: List<String>?,
         override val exampleUrls: List<String>?,
         override val matchAnyApp: Boolean?,
         override val matchSystemApp: Boolean?,
@@ -502,8 +435,6 @@ data class RawSubscription(
         override val priorityActionMaximum: Int?,
         override val order: Int?,
         override val forcedTime: Long?,
-        override val snapshotUrls: List<String>?,
-        override val excludeSnapshotUrls: List<String>?,
         override val exampleUrls: List<String>?,
         override val preKeys: List<Int>?,
         override val action: String?,
@@ -540,8 +471,6 @@ data class RawSubscription(
         override val matchDelay: Long?,
         override val matchTime: Long?,
         override val resetMatch: String?,
-        override val snapshotUrls: List<String>?,
-        override val excludeSnapshotUrls: List<String>?,
         override val exampleUrls: List<String>?,
         override val activityIds: List<String>?,
         override val excludeActivityIds: List<String>?,
@@ -589,8 +518,6 @@ data class RawSubscription(
         override val matchDelay: Long?,
         override val matchTime: Long?,
         override val resetMatch: String?,
-        override val snapshotUrls: List<String>?,
-        override val excludeSnapshotUrls: List<String>?,
         override val exampleUrls: List<String>?,
 
         override val activityIds: List<String>?,
@@ -869,8 +796,6 @@ data class RawSubscription(
                 matchDelay = getLong(jsonObject, "matchDelay"),
                 matchTime = getLong(jsonObject, "matchTime"),
                 resetMatch = getString(jsonObject, "resetMatch"),
-                snapshotUrls = getStringIArray(jsonObject, "snapshotUrls"),
-                excludeSnapshotUrls = getStringIArray(jsonObject, "excludeSnapshotUrls"),
                 exampleUrls = getStringIArray(jsonObject, "exampleUrls"),
                 actionMaximumKey = getInt(jsonObject, "actionMaximumKey"),
                 actionCdKey = getInt(jsonObject, "actionCdKey"),
@@ -914,8 +839,6 @@ data class RawSubscription(
                 matchDelay = getLong(jsonObject, "matchDelay"),
                 matchTime = getLong(jsonObject, "matchTime"),
                 resetMatch = getString(jsonObject, "resetMatch"),
-                snapshotUrls = getStringIArray(jsonObject, "snapshotUrls"),
-                excludeSnapshotUrls = getStringIArray(jsonObject, "excludeSnapshotUrls"),
                 exampleUrls = getStringIArray(jsonObject, "exampleUrls"),
                 actionMaximumKey = getInt(jsonObject, "actionMaximumKey"),
                 actionCdKey = getInt(jsonObject, "actionCdKey"),
@@ -974,8 +897,6 @@ data class RawSubscription(
                 matchDelay = getLong(jsonObject, "matchDelay"),
                 matchTime = getLong(jsonObject, "matchTime"),
                 resetMatch = getString(jsonObject, "resetMatch"),
-                snapshotUrls = getStringIArray(jsonObject, "snapshotUrls"),
-                excludeSnapshotUrls = getStringIArray(jsonObject, "excludeSnapshotUrls"),
                 exampleUrls = getStringIArray(jsonObject, "exampleUrls"),
                 actionMaximumKey = getInt(jsonObject, "actionMaximumKey"),
                 actionCdKey = getInt(jsonObject, "actionCdKey"),
@@ -1016,8 +937,6 @@ data class RawSubscription(
                 matchDelay = getLong(jsonObject, "matchDelay"),
                 matchTime = getLong(jsonObject, "matchTime"),
                 resetMatch = getString(jsonObject, "resetMatch"),
-                snapshotUrls = getStringIArray(jsonObject, "snapshotUrls"),
-                excludeSnapshotUrls = getStringIArray(jsonObject, "excludeSnapshotUrls"),
                 exampleUrls = getStringIArray(jsonObject, "exampleUrls"),
                 actionMaximumKey = getInt(jsonObject, "actionMaximumKey"),
                 actionCdKey = getInt(jsonObject, "actionCdKey"),

@@ -12,7 +12,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
-import li.songe.gkd.util.LOCAL_SUBS_IDS
+import li.songe.gkd.util.LOCAL_SUBS_ID
 import li.songe.gkd.util.format
 
 @Serializable
@@ -32,7 +32,7 @@ data class SubsItem(
     ) {
 
     val isLocal: Boolean
-        get() = LOCAL_SUBS_IDS.contains(id)
+        get() = id == LOCAL_SUBS_ID
 
     val mtimeStr by lazy { mtime.format("yyyy-MM-dd HH:mm:ss") }
 

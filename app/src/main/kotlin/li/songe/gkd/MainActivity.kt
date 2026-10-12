@@ -39,7 +39,6 @@ import li.songe.gkd.util.fixSomeProblems
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.mapState
 import kotlin.concurrent.Volatile
-import kotlin.reflect.jvm.jvmName
 
 class MainActivity : ComponentActivity() {
     val startTime = System.currentTimeMillis()
@@ -98,7 +97,7 @@ class MainActivity : ComponentActivity() {
             synchronized(topActivityFlow) {
                 updateTopActivity(
                     META.appId,
-                    MainActivity::class.jvmName
+                    MainActivity::class.java.name
                 )
             }
         }

@@ -6,22 +6,17 @@ import android.view.Display
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import li.songe.gkd.META
 import li.songe.gkd.data.ActionPerformer
-import li.songe.gkd.data.ActionResult
 import li.songe.gkd.data.AppRule
-import li.songe.gkd.data.GkdAction
 import li.songe.gkd.data.ResolvedRule
-import li.songe.gkd.data.RpcError
 import li.songe.gkd.data.RuleStatus
 import li.songe.gkd.isActivityVisible
 import li.songe.gkd.service.A11yService
@@ -30,10 +25,6 @@ import li.songe.gkd.store.storeFlow
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.showActionToast
 import li.songe.gkd.util.systemUiAppId
-import li.songe.selector.MatchOptions
-import li.songe.selector.Selector
-import li.songe.selector.SelectorCompileResult
-import li.songe.selector.SelectorTypeResult
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -128,7 +119,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         val a11yEvent = event.toA11yEvent() ?: return
         if (a11yEvent.type == CONTENT_CHANGED) {
             // 防止 content 类型事件过快
-            if (a11yEvent.time - lastContentEventTime < 100 && a11yEvent.time - appChangeTime > 5000 && a11yEvent.time - lastTriggerTime > 3000) {
+            if (a11yEvent.time - lastContentEventTime < 100 && a11yEvent.time - appChangeTime > SPLASH_ACTIVE_WINDOW && a11yEvent.time - lastTriggerTime > 3000) {
                 return
             }
             lastContentEventTime = a11yEvent.time
@@ -476,14 +467,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             get() = A11yService.instance
         val instance: A11yRuleEngine? get() = service?.ruleEngine
 
-        fun compatWindows(): List<AccessibilityWindowInfo> {
-            return try {
-                service?.windowInfos
-            } catch (_: Throwable) {
-                null
-            } ?: emptyList()
-        }
-
         fun onScreenForcedActive() {
             instance?.onScreenForcedActive()
         }
@@ -493,26 +476,5 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             if (r1 == true) return true
             return A11yService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true
         }
-
-        suspend fun execAction(gkdAction: GkdAction): ActionResult {
-            val selectorResult = Selector.compile(gkdAction.selector)
-            val selector = (selectorResult as? SelectorCompileResult.Success)?.value
-                ?: throw RpcError("非法选择器")
-            val typeResult = selector.validateType(selectorTypeModel)
-            if (typeResult is SelectorTypeResult.Failure) {
-                throw RpcError("选择器类型错误:${typeResult.error.message}")
-            }
-            val s = instance ?: throw RpcError("服务未连接")
-            val a = s.safeActiveWindow ?: throw RpcError("界面没有节点信息")
-            val targetNode = A11yContext(s, interruptable = false).querySelfOrSelector(
-                a, selector, MatchOptions(fastQuery = gkdAction.fastQuery)
-            ) ?: throw RpcError("没有查询到节点")
-            return withContext(Dispatchers.IO) {
-                ActionPerformer
-                    .getAction(gkdAction.action ?: ActionPerformer.None.action)
-                    .perform(targetNode, gkdAction)
-            }
-        }
-
     }
 }

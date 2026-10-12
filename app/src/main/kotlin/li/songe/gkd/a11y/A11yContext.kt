@@ -37,7 +37,6 @@ private val AccessibilityNodeInfo?.notExpiredNode: AccessibilityNodeInfo?
 
 class A11yContext(
     private val a11yEngine: A11yRuleEngine,
-    private val interruptable: Boolean = true,
 ) {
     private var childCache =
         LruCache<Pair<AccessibilityNodeInfo, Int>, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
@@ -116,7 +115,6 @@ class A11yContext(
     private var interruptInnerKey = 0
 
     private fun guardInterrupt() {
-        if (!interruptable) return
         if (interruptInnerKey == interruptKey) return
         interruptInnerKey = interruptKey
         val rule = currentRule ?: return

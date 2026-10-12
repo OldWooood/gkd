@@ -48,7 +48,6 @@ import li.songe.gkd.util.openWeChatScaner
 import li.songe.gkd.util.runMainPost
 import li.songe.gkd.util.toast
 import li.songe.loc.Loc
-import kotlin.reflect.jvm.jvmName
 
 data class PageScrollResetRequest(
     val id: Long,
@@ -220,7 +219,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
         val source = intent.getStringExtra(EntryActivity.activityNavSourceName)
         if (uri?.scheme == "gkd") {
             handleGkdUri(uri)
-        } else if (source == OpenFileActivity::class.jvmName && uri != null) {
+        } else if (source == OpenFileActivity::class.java.name && uri != null) {
             withContext(Dispatchers.IO) { BackupUtils.importBackUpData(uri) }
         }
     }

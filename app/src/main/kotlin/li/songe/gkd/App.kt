@@ -3,7 +3,6 @@ package li.songe.gkd
 import android.app.ActivityManager
 import android.app.AppOpsManager
 import android.app.Application
-import android.app.KeyguardManager
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
@@ -13,13 +12,9 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.database.ContentObserver
-import android.hardware.display.DisplayManager
-import android.hardware.input.InputManager
-import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
-import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.InputMethodManager
@@ -191,18 +186,11 @@ class App : Application() {
     val activityManager by lazy { app.getSystemService(ACTIVITY_SERVICE) as ActivityManager }
     val appOpsManager by lazy { app.getSystemService(APP_OPS_SERVICE) as AppOpsManager }
     val inputMethodManager by lazy { app.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager }
-    val inputManager by lazy { app.getSystemService(INPUT_SERVICE) as InputManager }
-    val mediaProjectionManager by lazy { getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager }
     val windowManager by lazy { app.getSystemService(WINDOW_SERVICE) as WindowManager }
-    val displayManager by lazy { app.getSystemService(DISPLAY_SERVICE) as DisplayManager }
-    val keyguardManager by lazy { app.getSystemService(KEYGUARD_SERVICE) as KeyguardManager }
     val clipboardManager by lazy { app.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager }
     val powerManager by lazy { getSystemService(POWER_SERVICE) as PowerManager }
     val a11yManager by lazy { getSystemService(ACCESSIBILITY_SERVICE) as AccessibilityManager }
     val launcherApps by lazy { getSystemService(LAUNCHER_APPS_SERVICE) as LauncherApps }
-
-    val compatDisplay: Display
-        get() = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
 
     override fun onCreate() {
         super.onCreate()

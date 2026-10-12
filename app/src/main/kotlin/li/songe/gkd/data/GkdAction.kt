@@ -14,15 +14,6 @@ import li.songe.gkd.util.ScreenUtils
 import kotlin.time.Duration.Companion.milliseconds
 
 @Serializable
-data class GkdAction(
-    val selector: String,
-    val fastQuery: Boolean = false,
-    val action: String? = null,
-    override val position: RawSubscription.Position? = null,
-    override val swipeArg: RawSubscription.SwipeArg? = null,
-) : RawSubscription.LocationProps
-
-@Serializable
 data class ActionResult(
     val action: String,
     val result: Boolean,

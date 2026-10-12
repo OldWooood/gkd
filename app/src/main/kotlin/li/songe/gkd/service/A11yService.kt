@@ -9,7 +9,6 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import com.google.android.accessibility.selecttospeak.SelectToSpeakService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -41,7 +40,6 @@ import kotlin.time.Duration.Companion.milliseconds
 abstract class A11yService : AccessibilityService(), OnA11yLife by DefaultA11yLifeImpl(),
     A11yCommonImpl {
     override val windowNodeInfo: AccessibilityNodeInfo? get() = rootInActiveWindow
-    override val windowInfos: List<AccessibilityWindowInfo> get() = windows
 
     override val ruleEngine by lazy { A11yRuleEngine(this) }
 

@@ -161,7 +161,7 @@ fun RuleGroupCard(
                         valid = false,
                         isSelectedMode = isSelectedMode,
                     )
-                } else if (checked != null) {
+                } else {
                     PerfSwitch(
                         key = Objects.hash(subs.id, appId, group.key),
                         modifier = switchModifier.minimumInteractiveComponentSize(),
@@ -174,11 +174,6 @@ fun RuleGroupCard(
                                 modifier = Modifier.size(8.dp)
                             )
                         }) else null,
-                    )
-                } else {
-                    InnerDisableSwitch(
-                        modifier = switchModifier,
-                        isSelectedMode = isSelectedMode,
                     )
                 }
             }

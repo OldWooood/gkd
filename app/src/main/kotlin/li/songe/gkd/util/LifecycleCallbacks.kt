@@ -2,12 +2,9 @@ package li.songe.gkd.util
 
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import li.songe.loc.Loc
 
 typealias CbFn = () -> Unit
@@ -37,9 +34,6 @@ interface OnSimpleLife {
                 )
             }
         }
-        if (this is OnTileLife) {
-            onTileClicked { LogUtils.d("onTileClicked -> " + this::class.simpleName, loc = loc) }
-        }
     }
 
     val scope: CoroutineScope
@@ -61,17 +55,6 @@ interface OnSimpleLife {
             toast("${name}已关闭", loc = loc)
         }
     }
-
-    fun runScopePost(delayMillis: Long, r: Runnable) {
-        if (delayMillis == 0L && isMainThread) {
-            r.run()
-            return
-        }
-        scope.launch(Dispatchers.Main) {
-            delay(delayMillis)
-            r.run()
-        }
-    }
 }
 
 open class DefaultSimpleLifeImpl : OnSimpleLife {
@@ -82,19 +65,6 @@ open class DefaultSimpleLifeImpl : OnSimpleLife {
 interface OnA11yLife : OnSimpleLife {
     fun onA11yConnected(f: CbFn) = cbs<CbFn>(3).add(f)
     fun onA11yConnected() = cbs<CbFn>(3).forEach { it() }
-}
-
-class DefaultTileLifeImpl : DefaultSimpleLifeImpl(), OnTileLife
-
-interface OnTileLife : OnSimpleLife {
-    fun onStartListened(f: CbFn) = cbs<CbFn>(4).add(f)
-    fun onStartListened() = cbs<CbFn>(4).forEach { it() }
-
-    fun onStopListened(f: CbFn) = cbs<CbFn>(5).add(f)
-    fun onStopListened() = cbs<CbFn>(5).forEach { it() }
-
-    fun onTileClicked(f: CbFn) = cbs<CbFn>(6).add(f)
-    fun onTileClicked() = cbs<CbFn>(6).forEach { it() }
 }
 
 class DefaultA11yLifeImpl : DefaultSimpleLifeImpl(), OnA11yLife

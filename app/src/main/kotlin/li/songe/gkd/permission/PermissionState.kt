@@ -159,7 +159,7 @@ object PermissionStates {
     val localNetwork by lazy {
         requestablePermissionState(
             name = "访问本地网络权限",
-            purpose = "用于通过无线调试连接特权服务及允许局域网设备访问 HTTP 服务",
+            purpose = "用于通过无线调试连接特权服务",
             permission = PermissionLists.getAccessLocalNetworkPermission(),
         )
     }
@@ -180,21 +180,12 @@ object PermissionStates {
     val drawOverlays by lazy {
         requestablePermissionState(
             name = "悬浮窗权限",
-            purpose = "用于显示快照按钮、界面信息和事件提示等悬浮内容",
+            purpose = "用于在无障碍服务不可用时显示触发提示",
             permission = PermissionLists.getSystemAlertWindowPermission(),
             check = {
                 // https://developer.android.com/security/fraud-prevention/activities?hl=zh-cn#hide_overlay_windows
                 Settings.canDrawOverlays(app)
             },
-        )
-    }
-
-    val writeExternalStorage by lazy {
-        requestablePermissionState(
-            name = "写入外部存储权限",
-            purpose = "用于在旧版本安卓保存截图或文件到公共存储",
-            permission = PermissionLists.getWriteExternalStoragePermission(),
-            check = { true },
         )
     }
 
@@ -232,7 +223,6 @@ object PermissionStates {
             foregroundServiceSpecialUse,
             appOpsAllowed,
             drawOverlays,
-            writeExternalStorage,
             ignoreBatteryOptimizations,
             writeSecureSettings,
             queryPackages,

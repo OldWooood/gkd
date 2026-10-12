@@ -57,9 +57,6 @@ sealed class ResolvedRule(
         null
     } ?: group.actionMaximum
 
-    private val hasSlowSelector by lazy {
-        (matches + excludeMatches + anyMatches + excludeAllMatches).any { s -> s.isSlow(matchOptions) }
-    }
     val priorityTime = rule.priorityTime ?: group.priorityTime ?: 0
     val priorityActionMaximum = rule.priorityActionMaximum ?: group.priorityActionMaximum ?: 1
     val priorityEnabled: Boolean
@@ -72,8 +69,6 @@ sealed class ResolvedRule(
         val t = System.currentTimeMillis()
         return t - matchChangedTime.value < priorityTime + matchDelay
     }
-
-    val isSlow by lazy { preKeys.isEmpty() && (matchTime == null || matchTime > 10_000L) && hasSlowSelector }
 
     var groupToRules: Map<out RawSubscription.RawGroupProps, List<ResolvedRule>> = emptyMap()
         set(value) {
@@ -108,7 +103,6 @@ sealed class ResolvedRule(
         }
 
     private var preRules = emptySet<ResolvedRule>()
-    val hasNext = group.rules.any { r -> r.preKeys?.any { k -> k == rule.key } == true }
 
     private var actionDelayTriggerTime = atomic(0L)
     val actionDelayJob = atomic<Job?>(null)

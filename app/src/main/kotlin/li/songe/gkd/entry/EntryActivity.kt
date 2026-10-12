@@ -6,7 +6,6 @@ import android.os.Bundle
 import li.songe.gkd.META
 import li.songe.gkd.MainActivity
 import li.songe.gkd.util.componentName
-import kotlin.reflect.jvm.jvmName
 
 abstract class EntryActivity : Activity() {
     companion object {
@@ -26,7 +25,7 @@ abstract class EntryActivity : Activity() {
             val navIntent = Intent(intent)
             navIntent.component = MainActivity::class.componentName
             navIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            navIntent.putExtra(activityNavSourceName, this::class.jvmName)
+            navIntent.putExtra(activityNavSourceName, this::class.java.name)
             startActivity(navIntent)
         }
         finish()

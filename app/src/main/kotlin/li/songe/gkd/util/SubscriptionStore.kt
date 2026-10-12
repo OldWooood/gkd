@@ -486,7 +486,6 @@ object SubscriptionStore {
         if (!file.exists()) {
             return when (id) {
                 LOCAL_SUBS_ID -> RawSubscription(id = id, name = "本地订阅", version = 0)
-                LOCAL_HTTP_SUBS_ID -> RawSubscription(id = id, name = "内存订阅", version = 0)
                 else -> error("订阅文件不存在")
             }
         }

@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -165,10 +164,6 @@ fun useDashboardPage(): ScaffoldExt {
                         switchAutomatorService()
                     }
                 },
-                mode = "无障碍",
-                onModeClick = {
-                    openA11ySettings()
-                },
             )
 
             PageSwitchItemCard(
@@ -302,11 +297,8 @@ private fun ServiceStatusCard(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    mode: String,
-    onModeClick: () -> Unit,
 ) {
     val onStatusClick = throttle { onCheckedChange(!checked) }
-    val onModeRowClick = throttle(onModeClick)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -338,54 +330,6 @@ private fun ServiceStatusCard(
             PerfSwitch(
                 checked = checked,
                 onCheckedChange = null,
-            )
-        }
-        HorizontalDivider(
-            modifier = Modifier.padding(
-                start = itemVerticalPadding + 40.dp + itemHorizontalPadding,
-                end = itemVerticalPadding,
-            ),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics(mergeDescendants = true) {}
-                .clickable(
-                    onClickLabel = "前往工作模式页面",
-                    onClick = onModeRowClick,
-                )
-                .padding(
-                    start = itemVerticalPadding,
-                    end = itemVerticalPadding,
-                    top = 10.dp,
-                    bottom = 10.dp,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            PerfIcon(
-                imageVector = PerfIcon.AutoMode,
-                modifier = Modifier
-                    .padding(horizontal = 10.dp)
-                    .size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                contentDescription = null,
-            )
-            Spacer(modifier = Modifier.width(itemHorizontalPadding))
-            Text(
-                text = "工作模式",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = mode,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            PerfIcon(
-                imageVector = PerfIcon.KeyboardArrowRight,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                contentDescription = null,
             )
         }
     }

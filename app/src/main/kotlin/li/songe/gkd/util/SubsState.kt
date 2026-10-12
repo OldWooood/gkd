@@ -181,14 +181,6 @@ data class RuleSummary(
     } else {
         EMPTY_RULE_TIP
     }
-
-    val slowGlobalGroups =
-        globalRules.filter { r -> r.isSlow }.distinctBy { r -> r.group }
-            .map { r -> r.group to r }
-    val slowAppGroups =
-        appIdToRules.values.flatten().filter { r -> r.isSlow }.distinctBy { r -> r.group }
-            .map { r -> r.group to r }
-    val slowGroupCount = slowGlobalGroups.size + slowAppGroups.size
 }
 
 val ruleSummaryFlow by lazy {

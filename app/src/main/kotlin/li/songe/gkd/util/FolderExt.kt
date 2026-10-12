@@ -34,20 +34,12 @@ private val filesDir: File by lazy {
 
 val dbFolder: File
     get() = filesDir.resolve("db").autoMk()
-val shFolder: File
-    get() = filesDir.resolve("sh").autoMk()
 val storeFolder: File
     get() = filesDir.resolve("store").autoMk()
 val subsFolder: File
     get() = filesDir.resolve("subscription").autoMk()
-val snapshotFolder: File
-    get() = filesDir.resolve("snapshot").autoMk()
 val logFolder: File
     get() = filesDir.resolve("log").autoMk()
-val crashFolder: File
-    get() = filesDir.resolve("crash").autoMk()
-val crashTempFolder: File
-    get() = filesDir.resolve("crash/temp").autoMk()
 
 val privateStoreFolder: File
     get() = app.filesDir.resolve("private-store").autoMk()
@@ -94,7 +86,7 @@ private data class AppJsonData(
 @WorkerThread
 fun buildLogFile(): File {
     val tempDir = createGkdTempDir()
-    val files = listOf(dbFolder, storeFolder, subsFolder, logFolder, crashFolder).filter {
+    val files = listOf(dbFolder, storeFolder, subsFolder, logFolder).filter {
         it.list()?.isNotEmpty() == true
     }.toMutableList()
     tempDir.resolve("source-paths.txt").also { file ->
