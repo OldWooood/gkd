@@ -153,8 +153,6 @@ sealed class ResolvedRule(
 
     private val performer = ActionPerformer.getAction(rule.action ?: rule.position?.let {
         ActionPerformer.ClickCenter.action
-    } ?: rule.swipeArg?.let {
-        ActionPerformer.Swipe.action
     })
 
     suspend fun performAction(node: AccessibilityNodeInfo) = performer.perform(node, rule)

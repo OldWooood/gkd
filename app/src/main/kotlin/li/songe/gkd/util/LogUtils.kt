@@ -2,25 +2,22 @@ package li.songe.gkd.util
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Build
 import android.util.Log
-import com.hjq.device.compat.DeviceBrand
-import com.hjq.device.compat.DeviceMarketName
-import com.hjq.device.compat.DeviceOs
 import li.songe.gkd.META
 import li.songe.gkd.app
-import li.songe.loc.Loc
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.days
 
 object LogUtils {
     fun d(
         vararg args: Any?,
-        @Loc loc: String = "",
-        @Loc("{fileName}") fileName: String = "",
+        loc: String = "",
+        fileName: String = "",
         tag: String = fileName.substringBeforeLast('.'),
     ) {
         val name = Thread.currentThread().name
-        val actualLoc = loc.substring("li.songe.gkd.".length)
+        val actualLoc = loc.removePrefix("li.songe.gkd.")
         val texts = args.map { stringify(it) }
         if (META.debuggable) {
             val msg = buildString {
@@ -47,11 +44,10 @@ private val logFileExecutor = Executors.newSingleThreadExecutor()
 private const val MAX_LOG_KEEP_DAYS = 7
 val deviceInfoDesc by lazy {
     listOf(
-        android.os.Build.MANUFACTURER,
-        android.os.Build.MODEL,
-        DeviceBrand.getBrandName(),
-        DeviceOs.getOsName() + DeviceOs.getOsVersionName() + DeviceOs.getOsBigVersionCode(),
-        DeviceMarketName.getMarketName(app)
+        Build.MANUFACTURER,
+        Build.MODEL,
+        Build.BRAND,
+        Build.DEVICE,
     ).joinToString("/")
 }
 private val deviceInfoText by lazy {

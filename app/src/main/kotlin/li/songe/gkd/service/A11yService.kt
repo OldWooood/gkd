@@ -80,7 +80,6 @@ abstract class A11yService : AccessibilityService(), OnA11yLife by DefaultA11yLi
             updateEnableAutomator(false)
         }
         useAliveOverlayView()
-        onCreated { StatusService.autoStart() }
         onDestroyed {
             synchronized(topActivityFlow) {
                 privilegeContextFlow.value?.run {

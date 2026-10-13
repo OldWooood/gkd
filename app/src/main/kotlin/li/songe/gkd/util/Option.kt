@@ -49,23 +49,6 @@ sealed class UpdateTimeOption(
     }
 }
 
-sealed class DarkThemeOption(
-    override val value: Boolean?,
-    override val label: String,
-    override val menuLabel: String,
-    override val icon: ImageVector
-) : Option<Boolean?>, OptionIcon, OptionMenuLabel {
-    override val options get() = objects
-
-    data object FollowSystem : DarkThemeOption(null, "自动", "自动", PerfIcon.AutoMode)
-    data object AlwaysEnable : DarkThemeOption(true, "启用", "深色", PerfIcon.DarkMode)
-    data object AlwaysDisable : DarkThemeOption(false, "关闭", "浅色", PerfIcon.LightMode)
-
-    companion object {
-        val objects by lazy { listOf(FollowSystem, AlwaysEnable, AlwaysDisable) }
-    }
-}
-
 sealed class EnableGroupOption(
     override val value: Boolean?,
     override val label: String
@@ -145,16 +128,5 @@ sealed class AppGroupOption(
     }
 }
 
-sealed class AutomatorModeOption(
-    override val value: Int,
-    override val label: String,
-) : Option<Int> {
-    override val options get() = objects
 
-    data object A11yMode : AutomatorModeOption(1, "无障碍")
-
-    companion object {
-        val objects by lazy { listOf(A11yMode) }
-    }
-}
 

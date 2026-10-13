@@ -13,7 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
@@ -24,7 +24,6 @@ import li.songe.gkd.App
 import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.data.AppInfo
-import li.songe.gkd.data.otherUserMapFlow
 import li.songe.gkd.data.toAppInfo
 import li.songe.gkd.data.toAppInfoAndIcon
 import li.songe.gkd.permission.PermissionStates
@@ -34,18 +33,9 @@ import kotlin.time.Duration.Companion.milliseconds
 
 val userAppInfoMapFlow = MutableStateFlow(emptyMap<String, AppInfo>())
 val userAppIconMapFlow = MutableStateFlow(emptyMap<String, Drawable>())
-val otherUserAppInfoMapFlow = MutableStateFlow(emptyMap<String, AppInfo>())
-val otherUserAppIconMapFlow = MutableStateFlow(emptyMap<String, Drawable>())
 
-val appInfoMapFlow by lazy {
-    combine(otherUserAppInfoMapFlow, userAppInfoMapFlow) { a, b -> a + b }
-        .stateIn(appScope, SharingStarted.Eagerly, emptyMap())
-}
-
-val appIconMapFlow by lazy {
-    combine(otherUserAppIconMapFlow, userAppIconMapFlow) { a, b -> a + b }
-        .stateIn(appScope, SharingStarted.Eagerly, emptyMap())
-}
+val appInfoMapFlow: StateFlow<Map<String, AppInfo>> get() = userAppInfoMapFlow
+val appIconMapFlow: StateFlow<Map<String, Drawable>> get() = userAppIconMapFlow
 
 val systemAppInfoCacheFlow by lazy {
     appInfoMapFlow.mapState(appScope) { c ->
@@ -121,42 +111,6 @@ const val PKG_FLAGS = PackageManager.MATCH_UNINSTALLED_PACKAGES
 
 val updateAppMutex = MutexState()
 
-private fun updateOtherUserAppInfo(userAppInfoMap: Map<String, AppInfo>? = null) {
-    val privilegeContext = privilegeContextFlow.value
-    val actualUserAppInfoMap = userAppInfoMap ?: userAppInfoMapFlow.value
-    if (privilegeContext == null || actualUserAppInfoMap.isEmpty()) {
-        otherUserMapFlow.value = emptyMap()
-        otherUserAppIconMapFlow.value = emptyMap()
-        otherUserAppInfoMapFlow.value = emptyMap()
-        return
-    }
-    val otherUsers = privilegeContext.getUsers()
-        .filter { it.id != currentUserId }
-        .sortedBy { it.id }
-    val userPackageInfoMap = otherUsers.associate { user ->
-        user.id to privilegeContext.getInstalledPackagesAsUser(
-            PKG_FLAGS,
-            user.id,
-        ).filterNot { actualUserAppInfoMap.contains(it.packageName) }
-    }
-    val newIconMap = HashMap<String, Drawable>()
-    val newAppMap = HashMap<String, AppInfo>()
-    userPackageInfoMap.forEach { (userId, pkgInfoList) ->
-        pkgInfoList.forEach { pkgInfo ->
-            if (!newAppMap.contains(pkgInfo.packageName)) {
-                val (appInfo, appIcon) = pkgInfo.toAppInfoAndIcon(userId)
-                newAppMap[pkgInfo.packageName] = appInfo
-                if (appIcon != null) {
-                    newIconMap[pkgInfo.packageName] = appIcon
-                }
-            }
-        }
-    }
-    otherUserMapFlow.value = otherUsers.associateBy { it.id }
-    otherUserAppInfoMapFlow.value = newAppMap
-    otherUserAppIconMapFlow.value = newIconMap
-}
-
 private fun updatePartAppInfo(
     appIds: Set<String>,
 ) = updateAppMutex.launchTry(appScope, Dispatchers.IO) {
@@ -178,7 +132,6 @@ private fun updatePartAppInfo(
             newIconMap.remove(appId)
         }
     }
-    updateOtherUserAppInfo(newAppMap)
     userAppInfoMapFlow.value = newAppMap
     userAppIconMapFlow.value = newIconMap
     LogUtils.d(
@@ -244,7 +197,6 @@ fun updateAllAppInfo(): Unit = updateAppMutex.launchTry(appScope, Dispatchers.IO
             }
         }
     }
-    updateOtherUserAppInfo(newAppMap)
     userAppInfoMapFlow.value = newAppMap
     userAppIconMapFlow.value = newIconMap
     if (!app.justStarted) {
@@ -262,13 +214,6 @@ fun updateAllAppInfo(): Unit = updateAppMutex.launchTry(appScope, Dispatchers.IO
 fun initAppState() {
     registerPackageListener()
     updateAllAppInfo()
-    appScope.launchTry {
-        privilegeContextFlow.drop(1).collect {
-            updateAppMutex.launchTry(appScope, Dispatchers.IO) {
-                updateOtherUserAppInfo()
-            }
-        }
-    }
     appScope.launchTry {
         willUpdateAppIds.debounce(3000.milliseconds)
             .filter { it.isNotEmpty() }

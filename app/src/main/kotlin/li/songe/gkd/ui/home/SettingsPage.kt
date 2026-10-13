@@ -3,7 +3,6 @@ package li.songe.gkd.ui.home
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,7 +35,6 @@ import li.songe.gkd.MainActivity
 import li.songe.gkd.R
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.AboutRoute
-import li.songe.gkd.ui.component.CustomOutlinedTextField
 import li.songe.gkd.ui.component.AppAlertDialog
 import li.songe.gkd.ui.component.PerfCustomIconButton
 import li.songe.gkd.ui.component.PerfIcon
@@ -45,7 +43,6 @@ import li.songe.gkd.ui.component.PerfTopAppBar
 import li.songe.gkd.ui.component.SettingItem
 import li.songe.gkd.ui.component.SettingsDialog
 import li.songe.gkd.ui.component.TextListDialog
-import li.songe.gkd.ui.component.TextMenu
 import li.songe.gkd.ui.component.TextSwitch
 import li.songe.gkd.ui.component.autoFocus
 import li.songe.gkd.ui.component.rememberColumnScrollState
@@ -54,11 +51,7 @@ import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.iconTextSize
 import li.songe.gkd.ui.style.itemHorizontalPadding
 import li.songe.gkd.ui.style.titleItemPadding
-import li.songe.gkd.util.DarkThemeOption
-import li.songe.gkd.util.findOption
 import li.songe.gkd.util.launchTry
-import li.songe.gkd.util.saveFileToDownloads
-import li.songe.gkd.util.shareFile
 import li.songe.gkd.util.throttle
 import li.songe.gkd.util.toast
 
@@ -69,37 +62,9 @@ fun useSettingsPage(): ScaffoldExt {
     val mainVm = LocalMainViewModel.current
     val context = LocalActivity.current as MainActivity
     val vm = viewModel<SettingsVm>()
-    val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
     val actionScope = vm.scope
     val showToastInputDlg by vm.showActionToastDialogFlow.collectAsStateWithLifecycle()
-    val showNotifTextInputDlg by vm.showNotificationTextDialogFlow.collectAsStateWithLifecycle()
-    val showBackupDialog by vm.showBackupDialogFlow.collectAsStateWithLifecycle()
-    val showExportBackupDialog by vm.showExportBackupDialogFlow.collectAsStateWithLifecycle()
-    val showToastSettingsDialog by vm.toastSettingsDialogVisibleFlow.collectAsStateWithLifecycle()
-
-    if (showToastSettingsDialog) {
-        SettingsDialog(
-            title = "提示设置",
-            onDismissRequest = { vm.setToastSettingsDialogVisible(false) },
-        ) {
-            TextSwitch(
-                title = "提示样式",
-                subtitle = "使用系统样式",
-                suffix = "查看限制",
-                onSuffixClick = {
-                    actionScope.launchTry {
-                        mainVm.dialogRequests.showMessage(
-                            title = "限制说明",
-                            text = "系统 Toast 存在频率限制, 触发过于频繁会被系统强制不显示\n\n如果只使用开屏一类低频率规则可使用系统提示, 否则建议关闭此项使用自定义样式提示",
-                        )
-                    }
-                },
-                checked = store.useSystemToast,
-                onCheckedChange = vm::setUseSystemToast,
-            )
-        }
-    }
 
     if (showToastInputDlg) {
         var value by remember {
@@ -170,147 +135,6 @@ fun useSettingsPage(): ScaffoldExt {
         )
     }
 
-    if (showNotifTextInputDlg) {
-        var titleValue by remember { mutableStateOf(store.customNotifTitle) }
-        var textValue by remember { mutableStateOf(store.customNotifText) }
-        AppAlertDialog(
-            properties = DialogProperties(dismissOnClickOutside = false),
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(text = "通知文案")
-                    PerfIconButton(
-                        imageVector = PerfIcon.HelpOutline,
-                        contentDescription = "文案规则",
-                        onClickLabel = "打开文案规则弹窗",
-                        onClick = throttle {
-                            actionScope.launchTry {
-                                mainVm.dialogRequests.showMessage(
-                                    title = "文案规则",
-                                    text = $$"通知文案支持变量替换，规则如下\n${i} 全局规则数\n${k} 应用数\n${u} 应用规则数\n${n} 触发次数\n\n示例模板\n${i}全局/${k}应用/${u}规则/${n}触发\n\n替换结果\n0全局/1应用/2规则/3触发",
-                                )
-                            }
-                        },
-                    )
-                }
-            },
-            text = {
-                val titleMaxLen = 32
-                val textMaxLen = 64
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    CustomOutlinedTextField(
-                        label = { Text("主标题") },
-                        value = titleValue,
-                        placeholder = { Text(text = "请输入内容，支持变量替换") },
-                        onValueChange = {
-                            titleValue = (if (it.length > titleMaxLen) it.take(titleMaxLen) else it)
-                                .filter { c -> c !in "\n\r" }
-                        },
-                        supportingText = {
-                            Text(
-                                text = "${titleValue.length} / $titleMaxLen",
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.End,
-                            )
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(12.dp),
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    CustomOutlinedTextField(
-                        label = { Text("副标题") },
-                        value = textValue,
-                        placeholder = { Text(text = "请输入内容，支持变量替换") },
-                        onValueChange = {
-                            textValue = if (it.length > textMaxLen) it.take(textMaxLen) else it
-                        },
-                        supportingText = {
-                            Text(
-                                text = "${textValue.length} / $textMaxLen",
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.End,
-                            )
-                        },
-                        maxLines = 4,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .autoFocus(),
-                        contentPadding = PaddingValues(12.dp),
-                    )
-                }
-            },
-            onDismissRequest = {
-                vm.setNotificationTextDialogVisible(false)
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    context.imeController.requestHide()
-                    if (vm.saveNotificationText(titleValue, textValue)) {
-                        toast("更新成功")
-                    }
-                    vm.setNotificationTextDialogVisible(false)
-                }) {
-                    Text(
-                        text = "确认",
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { vm.setNotificationTextDialogVisible(false) }) {
-                    Text(
-                        text = "取消",
-                    )
-                }
-            })
-    }
-
-
-    if (showBackupDialog) {
-        TextListDialog(
-            onDismiss = { vm.setBackupDialogVisible(false) },
-            textList = listOf(
-                "导入备份" to {
-                    actionScope.launchTry {
-                        val uri = mainVm.activityResults.openDocument(ZIP_MIME_TYPE)
-                        if (uri == null) {
-                            toast("未选择文件")
-                            return@launchTry
-                        }
-                        vm.importBackup(uri)
-                    }
-                },
-                "导出备份" to {
-                    vm.setExportBackupDialogVisible(true)
-                },
-            )
-        )
-    }
-    if (showExportBackupDialog) {
-        TextListDialog(
-            onDismiss = { vm.setExportBackupDialogVisible(false) },
-            textList = listOf(
-                "分享到其他应用" to {
-                    actionScope.launchTry {
-                        val file = vm.exportBackup()
-                        context.shareFile(file, "分享备份文件")
-                    }
-                },
-                "保存到下载" to {
-                    actionScope.launchTry {
-                        val file = vm.exportBackup()
-                        context.saveFileToDownloads(file)
-                    }
-                },
-            )
-        )
-    }
-
     val pageScrollState = rememberColumnScrollState()
     val scrollBehavior = pageScrollState.scrollBehavior
     val scrollState = pageScrollState.scrollState
@@ -349,33 +173,8 @@ fun useSettingsPage(): ScaffoldExt {
                 onClick = {
                     vm.setActionToastDialogVisible(true)
                 },
-                suffixIcon = {
-                    PerfCustomIconButton(
-                        size = 32.dp,
-                        iconSize = 20.dp,
-                        onClickLabel = "打开提示设置弹窗",
-                        onClick = { vm.setToastSettingsDialogVisible(true) },
-                        id = R.drawable.ic_page_info,
-                        contentDescription = "提示设置",
-                        tint = if (showToastSettingsDialog) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
-                },
                 onCheckedChange = {
                     vm.setToastWhenClick(it)
-                })
-
-            TextSwitch(
-                title = "通知文案",
-                subtitle = if (store.useCustomNotifText) {
-                    store.customNotifTitle + " / " + store.customNotifText
-                } else {
-                    subsStatus
-                },
-                checked = store.useCustomNotifText,
-                onClickLabel = "打开修改通知文案弹窗",
-                onClick = { vm.setNotificationTextDialogVisible(true) },
-                onCheckedChange = {
-                    vm.setUseCustomNotificationText(it)
                 })
 
             TextSwitch(
@@ -396,38 +195,11 @@ fun useSettingsPage(): ScaffoldExt {
                 })
 
             Text(
-                text = "外观",
-                modifier = Modifier.titleItemPadding(),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-
-            TextMenu(
-                title = "深色模式",
-                option = DarkThemeOption.objects.findOption(store.enableDarkTheme),
-                onOptionChange = {
-                    vm.setDarkTheme(it.value)
-                }
-            )
-
-            TextSwitch(
-                title = "动态配色",
-                checked = store.enableDynamicColor,
-                onCheckedChange = {
-                    vm.setDynamicColor(it)
-                }
-            )
-
-            Text(
                 text = "其他",
                 modifier = Modifier.titleItemPadding(),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
-
-            SettingItem(title = "备份恢复", onClick = {
-                vm.setBackupDialogVisible(true)
-            })
 
             SettingItem(title = "关于", onClick = {
                 mainVm.navigatePage(AboutRoute)

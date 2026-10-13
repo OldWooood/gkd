@@ -18,12 +18,6 @@ val json by lazy {
     }
 }
 
-val keepNullJson by lazy {
-    Json(from = json) {
-        explicitNulls = true
-    }
-}
-
 val client by lazy {
     HttpClient(OkHttp) {
         install(ContentNegotiation) {

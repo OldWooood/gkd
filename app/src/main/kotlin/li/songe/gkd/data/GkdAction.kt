@@ -94,95 +94,6 @@ sealed class ActionPerformer(val action: String) {
         }
     }
 
-    data object LongClickNode : ActionPerformer("longClickNode") {
-        override suspend fun perform(
-            node: AccessibilityNodeInfo,
-            locationProps: RawSubscription.LocationProps,
-        ): ActionResult {
-            return ActionResult(
-                action = action,
-                result = node.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK).apply {
-                    if (this) {
-                        delay(LongClickCenter.LONG_DURATION.milliseconds)
-                    }
-                }
-            )
-        }
-    }
-
-    data object LongClickCenter : ActionPerformer("longClickCenter") {
-        const val LONG_DURATION = 500L
-        override suspend fun perform(
-            node: AccessibilityNodeInfo,
-            locationProps: RawSubscription.LocationProps,
-        ): ActionResult {
-            val rect = node.toHidden.boundsInScreen
-            val p = locationProps.position?.calc(rect)
-            val x = p?.first ?: ((rect.right + rect.left) / 2f)
-            val y = p?.second ?: ((rect.bottom + rect.top) / 2f)
-            // 某些系统的 ViewConfiguration.getLongPressTimeout() 返回 300 , 这将导致触发普通的 click 事件
-            if (!ScreenUtils.inScreen(x, y)) {
-                return ActionResult(
-                    action = action,
-                    result = false,
-                    position = x to y,
-                )
-            }
-            return ActionResult(
-                action = action,
-                result = if (
-                    privilegeContextFlow.value?.tap(x, y, LONG_DURATION) == true
-                ) {
-                    true
-                } else {
-                    val gestureDescription = GestureDescription.Builder()
-                    val path = Path()
-                    path.moveTo(x, y)
-                    gestureDescription.addStroke(
-                        GestureDescription.StrokeDescription(
-                            path, 0, LONG_DURATION
-                        )
-                    )
-                    (A11yService.instance?.dispatchGesture(
-                        gestureDescription.build(), null, null
-                    ) != null).apply {
-                        if (this) {
-                            delay(LONG_DURATION.milliseconds)
-                        }
-                    }
-                },
-                position = x to y
-            )
-        }
-    }
-
-    data object LongClick : ActionPerformer("longClick") {
-        override suspend fun perform(
-            node: AccessibilityNodeInfo,
-            locationProps: RawSubscription.LocationProps,
-        ): ActionResult {
-            if (node.isLongClickable) {
-                val result = LongClickNode.perform(node, locationProps)
-                if (result.result) {
-                    return result
-                }
-            }
-            return LongClickCenter.perform(node, locationProps)
-        }
-    }
-
-    data object Back : ActionPerformer("back") {
-        override suspend fun perform(
-            node: AccessibilityNodeInfo,
-            locationProps: RawSubscription.LocationProps,
-        ): ActionResult {
-            return ActionResult(
-                action = action,
-                result = A11yRuleEngine.performActionBack()
-            )
-        }
-    }
-
     data object None : ActionPerformer("none") {
         override suspend fun perform(
             node: AccessibilityNodeInfo,
@@ -195,87 +106,13 @@ sealed class ActionPerformer(val action: String) {
         }
     }
 
-    data object Swipe : ActionPerformer("swipe") {
-        override suspend fun perform(
-            node: AccessibilityNodeInfo,
-            locationProps: RawSubscription.LocationProps,
-        ): ActionResult {
-            val rect = node.toHidden.boundsInScreen
-            val swipeArg = locationProps.swipeArg ?: return ActionResult(
-                action = action,
-                result = false,
-            )
-            val startP = swipeArg.start.calc(rect)
-            val endP = swipeArg.end?.calc(rect) ?: startP
-            if (startP == null || endP == null) {
-                return ActionResult(
-                    action = action,
-                    result = false,
-                )
-            }
-            val startX = startP.first
-            val startY = startP.second
-            val endX = endP.first
-            val endY = endP.second
-            if (!(ScreenUtils.inScreen(startX, startY) && ScreenUtils.inScreen(endX, endY))) {
-                return ActionResult(
-                    action = action,
-                    result = false,
-                    position = endX to endY,
-                )
-            }
-            return if (
-                privilegeContextFlow.value?.swipe(
-                    startX,
-                    startY,
-                    endX,
-                    endY,
-                    swipeArg.duration,
-                ) == true
-            ) {
-                ActionResult(
-                    action = action,
-                    result = true,
-                    shell = true,
-                    position = endX to endY,
-                )
-            } else {
-                val gestureDescription = GestureDescription.Builder()
-                val path = Path()
-                path.moveTo(startX, startY)
-                path.lineTo(endX, endY)
-                gestureDescription.addStroke(
-                    GestureDescription.StrokeDescription(
-                        path, 0, swipeArg.duration
-                    )
-                )
-                ActionResult(
-                    action = action,
-                    result = (A11yService.instance?.dispatchGesture(
-                        gestureDescription.build(), null, null
-                    ) != null).apply {
-                        if (this) {
-                            delay(swipeArg.duration.milliseconds)
-                        }
-                    },
-                    position = endX to endY,
-                )
-            }
-        }
-    }
-
     companion object {
         private val allSubObjects by lazy {
             arrayOf(
                 ClickNode,
                 ClickCenter,
                 Click,
-                LongClickNode,
-                LongClickCenter,
-                LongClick,
-                Back,
                 None,
-                Swipe,
             )
         }
 

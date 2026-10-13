@@ -9,16 +9,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import li.songe.gkd.permission.PermissionStates
+import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.share.LocalMainViewModel
-import li.songe.gkd.util.launchAsFn
 import li.songe.gkd.util.throttle
-import li.songe.gkd.util.updateAppMutex
 
 @Composable
 fun QueryPkgAuthCard(
@@ -36,18 +33,17 @@ fun QueryPkgAuthCard(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "如需显示所有应用\n请授予「读取应用列表权限」",
+            text = "如需显示所有应用\n请连接特权服务自动授权",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         TextButton(
-            enabled = !updateAppMutex.state.collectAsStateWithLifecycle().value,
-            onClick = throttle(fn = mainVm.scope.launchAsFn {
-                mainVm.permissionRequests.ensurePermissions(PermissionStates.queryPackages)
-            })
+            onClick = throttle {
+                mainVm.navigatePage(PrivilegeServiceRoute)
+            }
         ) {
-            Text(text = "申请权限")
+            Text(text = "前往特权服务")
         }
     }
 }

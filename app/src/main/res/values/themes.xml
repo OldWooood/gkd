@@ -8,18 +8,6 @@
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
-    <style name="SplashScreenLightTheme" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/gkd_black</item>
-        <item name="windowSplashScreenAnimationDuration">1000</item>
-        <item name="postSplashScreenTheme">@style/AppLightTheme</item>
-    </style>
-
-    <style name="SplashScreenNightTheme" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/gkd_white</item>
-        <item name="windowSplashScreenAnimationDuration">1000</item>
-        <item name="postSplashScreenTheme">@style/AppNightTheme</item>
-    </style>
-
     <style name="TransparentTheme">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
@@ -27,7 +15,5 @@
     </style>
 
     <style name="AppTheme" parent="AppLightTheme" />
-
-    <style name="SplashScreenTheme" parent="SplashScreenLightTheme" />
 
 </resources>

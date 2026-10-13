@@ -27,8 +27,6 @@ import li.songe.gkd.util.PKG_FLAGS
 import li.songe.gkd.util.RuleSummary
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.ruleSummaryFlow
-import li.songe.gkd.util.systemUiAppId
-import li.songe.loc.Loc
 
 data class TopActivity(
     val appId: String = "",
@@ -138,7 +136,7 @@ fun updateTopActivity(
     appId: String,
     activityId: String?,
     scene: ActivityScene = ActivityScene.A11y,
-    @Loc loc: String = "",
+    loc: String = "",
 ) {
     val t = System.currentTimeMillis()
     val oldActivity = topActivityFlow.value
@@ -223,7 +221,6 @@ var appChangeTime = 0L
 
 var imeAppId = ""
 var launcherAppId = ""
-var systemRecentCn = ComponentName("", "")
 
 fun updateSystemDefaultAppId() {
     imeAppId = app.getSecureString(Settings.Secure.DEFAULT_INPUT_METHOD)
@@ -231,20 +228,6 @@ fun updateSystemDefaultAppId() {
     val launcherCn = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         .resolveActivity(app.packageManager)
     launcherAppId = launcherCn.packageName
-    if (app.getPkgInfo(launcherAppId)?.applicationInfo?.isSystem == true) {
-        systemRecentCn = launcherCn
-    } else {
-        systemRecentCn = ComponentName.unflattenFromString(
-            app.getString(com.android.internal.R.string.config_recentsComponentName)
-        ) ?: systemRecentCn
-        if (systemRecentCn.packageName.isEmpty()) {
-            // https://github.com/android-cs/8/blob/main/packages/SystemUI/src/com/android/systemui/recents/RecentsActivity.java
-            systemRecentCn = ComponentName(
-                systemUiAppId,
-                "$systemUiAppId.recents.RecentsActivity",
-            )
-        }
-    }
 }
 
 private val actionLogMutex = Mutex()

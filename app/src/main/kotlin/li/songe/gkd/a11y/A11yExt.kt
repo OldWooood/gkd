@@ -74,10 +74,6 @@ const val MAX_DESCENDANTS_SIZE = 4096
 
 private val nodeTimeCache = ConcurrentHashMap<AccessibilityNodeInfo, Long>()
 
-fun clearNodeTimeCache() {
-    nodeTimeCache.clear()
-}
-
 fun AccessibilityNodeInfo.setGeneratedTime(): AccessibilityNodeInfo {
     if (nodeTimeCache.size >= MAX_DESCENDANTS_SIZE) {
         nodeTimeCache.clear()

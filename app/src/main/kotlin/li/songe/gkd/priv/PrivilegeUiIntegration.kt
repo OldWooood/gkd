@@ -4,10 +4,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import li.songe.gkd.appScope
-import li.songe.gkd.priv.shizuku.GkdShizukuExternalStartProvider
+import li.songe.gkd.store.createTextFlow
 import priv.kit.core.Privilege
-import priv.kit.ui.PrivilegeUi
-import priv.kit.ui.PrivilegeUiConfig
 
 enum class PrivilegeServiceStatus {
     Connected,
@@ -15,9 +13,14 @@ enum class PrivilegeServiceStatus {
     DisconnectedDesired,
 }
 
+val privilegeDesiredEnabledFlow = createTextFlow(
+    key = "privilege_desired_enabled",
+    decode = { it == "true" },
+    encode = { it.toString() },
+)
+
 val privilegeServiceStatusFlow by lazy {
     val serverState = Privilege.serverState
-    val desiredEnabled = PrivilegeUi.desiredEnabled
     val resolve = { connected: Boolean, desired: Boolean ->
         when {
             connected -> PrivilegeServiceStatus.Connected
@@ -25,19 +28,11 @@ val privilegeServiceStatusFlow by lazy {
             else -> PrivilegeServiceStatus.Disconnected
         }
     }
-    combine(serverState, desiredEnabled) { serverInfo, desired ->
+    combine(serverState, privilegeDesiredEnabledFlow) { serverInfo, desired ->
         resolve(serverInfo != null, desired)
     }.stateIn(
         appScope,
         SharingStarted.Eagerly,
-        resolve(serverState.value != null, desiredEnabled.value),
-    )
-}
-
-val gkdPrivilegeUiConfig: PrivilegeUiConfig by lazy {
-    PrivilegeUiConfig(
-        externalStartProviders = listOf(
-            GkdShizukuExternalStartProvider,
-        ),
+        resolve(serverState.value != null, privilegeDesiredEnabledFlow.value),
     )
 }

@@ -7,15 +7,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,36 +20,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.WindowInsetsControllerCompat
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChangedBy
 import li.songe.gkd.app
-import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.share.LocalDarkTheme
 import li.songe.gkd.ui.share.LocalIsTalkbackEnabled
-
-private val LightColorScheme = lightColorScheme()
-private val DarkColorScheme = darkColorScheme()
 
 @Composable
 fun AppTheme(
     invertedTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val appearanceFlow = remember {
-        storeFlow
-            .distinctUntilChangedBy { it.enableDarkTheme to it.enableDynamicColor }
-            .debounce(300)
-    }
-    val store by appearanceFlow.collectAsStateWithLifecycle(storeFlow.value)
     val systemInDarkTheme = isSystemInDarkTheme()
-    val darkTheme = (store.enableDarkTheme ?: systemInDarkTheme).let {
-        if (invertedTheme) !it else it
-    }
+    val darkTheme = if (invertedTheme) !systemInDarkTheme else systemInDarkTheme
     val colorScheme = when {
-        store.enableDynamicColor && darkTheme -> dynamicDarkColorScheme(app)
-        store.enableDynamicColor && !darkTheme -> dynamicLightColorScheme(app)
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        darkTheme -> dynamicDarkColorScheme(app)
+        else -> dynamicLightColorScheme(app)
     }
 
     val activity = LocalActivity.current

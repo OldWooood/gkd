@@ -1,59 +1,11 @@
 package li.songe.gkd.util
 
-import android.app.Service
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Environment
-import android.provider.MediaStore
 import android.provider.Settings
-import android.webkit.MimeTypeMap
-import androidx.core.content.FileProvider
 import androidx.core.net.toUri
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import li.songe.gkd.META
-import li.songe.gkd.MainActivity
 import li.songe.gkd.app
-import li.songe.gkd.isActivityVisible
-import li.songe.gkd.permission.PermissionStates
-import java.io.File
-import kotlin.reflect.KClass
-
-fun MainActivity.shareFile(file: File, title: String) {
-    val uri = FileProvider.getUriForFile(
-        app, "${app.packageName}.provider", file
-    )
-    val intent = Intent().apply {
-        action = Intent.ACTION_SEND
-        putExtra(Intent.EXTRA_STREAM, uri)
-        type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    tryStartActivity(
-        Intent.createChooser(
-            intent, title
-        )
-    )
-}
-
-suspend fun MainActivity.saveFileToDownloads(file: File) {
-    val values = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
-        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-    }
-    withContext(Dispatchers.IO) {
-        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-            ?: error("创建URI失败")
-        contentResolver.openOutputStream(uri)?.use { outputStream ->
-            outputStream.write(file.readBytes())
-            outputStream.flush()
-        }
-    }
-    toast("已保存 ${file.name} 到下载")
-}
 
 fun Context.tryStartActivity(intent: Intent) {
     try {
@@ -107,20 +59,3 @@ fun openUri(uri: Uri) {
     app.tryStartActivity(intent)
 }
 
-fun <T : Service> stopServiceByClass(clazz: KClass<T>) {
-    val intent = Intent(app, clazz.java)
-    app.stopService(intent)
-}
-
-fun <T : Service> startForegroundServiceByClass(clazz: KClass<T>) {
-    if (!PermissionStates.notification.checkOrToast()) return
-    if (!PermissionStates.foregroundServiceSpecialUse.checkOrToast()) return
-    val intent = Intent(app, clazz.java)
-    try {
-        app.startForegroundService(intent)
-    } catch (e: Throwable) {
-        LogUtils.d(e)
-        val prefix = if (isActivityVisible) "" else "${META.appName}: "
-        toast("${prefix}启动服务失败: ${e.message}", forced = true)
-    }
-}

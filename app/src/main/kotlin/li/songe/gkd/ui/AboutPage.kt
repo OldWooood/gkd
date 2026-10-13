@@ -31,10 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.colorResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -56,12 +52,10 @@ import li.songe.gkd.ui.share.LocalMainViewModel
 import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.itemPadding
 import li.songe.gkd.ui.style.titleItemPadding
-import li.songe.gkd.util.ISSUES_URL
 import li.songe.gkd.util.REPOSITORY_URL
 import li.songe.gkd.util.ShortUrlSet
 import li.songe.gkd.util.UpdateChannelOption
 import li.songe.gkd.util.findOption
-import li.songe.gkd.util.launchAsFn
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.throttle
 import li.songe.gkd.util.toast
@@ -91,12 +85,6 @@ fun AboutPage() {
                     )
                 },
                 title = { Text(text = "关于") },
-                actions = {
-                    PerfIconButton(
-                        imageVector = PerfIcon.Share,
-                        onClick = { vm.setShareAppDialogVisible(true) },
-                    )
-                }
             )
         }
     ) { contentPadding ->
@@ -143,15 +131,6 @@ fun AboutPage() {
                     mainVm.openUrl(REPOSITORY_URL)
                 },
             )
-            if (META.isGkdChannel) {
-                SettingItem(
-                    imageVector = null,
-                    title = "捐赠支持",
-                    onClick = {
-                        mainVm.openWebPage(ShortUrlSet.URL10)
-                    },
-                )
-            }
             SettingItem(
                 imageVector = null,
                 title = "使用协议",
@@ -167,14 +146,6 @@ fun AboutPage() {
                 },
             )
 
-            FeedbackSection()
-            SettingItem(
-                title = "导出日志",
-                imageVector = PerfIcon.Share,
-                onClick = {
-                    mainVm.shareLog.show()
-                }
-            )
             if (mainVm.updateStatus != null) {
                 Text(
                     text = "更新",
@@ -223,54 +194,6 @@ fun AboutPage() {
     }
 
     AboutDialogs()
-}
-
-@Composable
-private fun FeedbackSection() {
-    val mainVm = LocalMainViewModel.current
-    val vm = viewModel<AboutVm>()
-    val primaryColor = MaterialTheme.colorScheme.primary
-    Text(
-        text = "反馈",
-        modifier = Modifier.titleItemPadding(),
-        style = MaterialTheme.typography.titleSmall,
-        color = primaryColor,
-    )
-    Column(
-        modifier = Modifier
-            .clickable(onClick = throttle(vm.scope.launchAsFn {
-                val noticeText = buildAnnotatedString {
-                    val highlightStyle = SpanStyle(
-                        fontWeight = FontWeight.Bold,
-                        color = primaryColor,
-                    )
-                    append("感谢您愿意花时间反馈，")
-                    withStyle(style = highlightStyle) {
-                        append("GKD 默认不携带任何规则，只接受应用本体功能相关的反馈")
-                    }
-                    append("\n\n")
-                    append("请先判断是不是第三方规则订阅的问题，如果是，您应该向规则提供者反馈，而不是在此处反馈。")
-                    withStyle(style = highlightStyle) {
-                        append("如果您已经确信是 GKD 应用本体的问题")
-                    }
-                    append("，可点击下方继续反馈")
-                }
-                if (!mainVm.dialogRequests.confirm(
-                    title = "反馈须知",
-                    text = noticeText,
-                    confirmText = "继续",
-                    dismissOnRequest = true,
-                )) return@launchAsFn
-                mainVm.openUrl(ISSUES_URL)
-            }))
-            .fillMaxWidth()
-            .itemPadding()
-    ) {
-        Text(
-            text = "问题反馈",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-    }
 }
 
 @Composable

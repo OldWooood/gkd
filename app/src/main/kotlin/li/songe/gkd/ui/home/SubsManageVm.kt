@@ -93,12 +93,6 @@ class SubsManageVm : BaseViewModel() {
     suspend fun deleteSubscriptions(ids: Set<Long>): SubscriptionResult =
         SubscriptionStore.delete(*ids.toLongArray())
 
-    fun updateOrder(items: List<SubsItem>) {
-        scope.launchTry(Dispatchers.IO) {
-            DbSet.subsItemDao.batchUpdateOrder(items)
-        }
-    }
-
     private fun shouldWarnBeforeEnabling(item: SubsItem): Boolean {
         val state = uiState.value.value ?: return false
         return storeFlow.value.subsPowerWarn &&

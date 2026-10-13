@@ -4,28 +4,20 @@ import android.Manifest
 import android.app.AppOpsManager
 import android.app.AppOpsManagerHidden
 import android.provider.Settings
-import com.hjq.permissions.XXPermissions
-import com.hjq.permissions.permission.PermissionLists
-import com.hjq.permissions.permission.base.IPermission
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.updateAndGet
 import li.songe.gkd.app
 import li.songe.gkd.appScope
-import li.songe.gkd.priv.privilegeContextFlow
-import li.songe.gkd.util.toast
+import li.songe.gkd.util.AndroidTarget
 import li.songe.gkd.util.updateAllAppInfo
 import li.songe.gkd.util.updateAppMutex
-import priv.kit.core.Privilege
 
 class PermissionState(
     val name: String,
     private val check: () -> Boolean,
-    val permission: IPermission? = null,
-    val purpose: String? = null,
-    val resolution: PermissionResolution? = null,
     private val onChanged: (() -> Unit)? = null,
 ) {
     val stateFlow = MutableStateFlow(false)
@@ -43,38 +35,7 @@ class PermissionState(
         }
         return newValue
     }
-
-    fun checkOrToast(): Boolean {
-        val granted = refresh()
-        if (!granted) {
-            toast("请先授予「$name」")
-        }
-        return granted
-    }
 }
-
-data class PermissionResolution(
-    val message: String,
-    val confirmText: String = "去设置",
-    val navigateToPrivilegeService: Boolean = false,
-)
-
-private fun requestablePermissionState(
-    name: String,
-    purpose: String,
-    permission: IPermission,
-    check: () -> Boolean = { XXPermissions.isGrantedPermission(app, permission) },
-    onChanged: (() -> Unit)? = null,
-) = PermissionState(
-    name = name,
-    check = check,
-    permission = permission,
-    purpose = purpose,
-    resolution = PermissionResolution(
-        message = "未授予「$name」\n请前往系统权限设置开启",
-    ),
-    onChanged = onChanged,
-)
 
 private fun checkAllowedOp(op: String): Boolean = app.appOpsManager.checkOpNoThrow(
     op,
@@ -86,22 +47,6 @@ private fun checkAllowedOp(op: String): Boolean = app.appOpsManager.checkOpNoThr
 
 
 object PermissionStates {
-    // https://github.com/gkd-kit/gkd/issues/954
-    // https://github.com/gkd-kit/gkd/issues/887
-    val foregroundServiceSpecialUse by lazy {
-        PermissionState(
-            name = "特殊用途的前台服务",
-            check = {
-                checkAllowedOp(AppOpsManagerHidden.OPSTR_FOREGROUND_SERVICE_SPECIAL_USE)
-            },
-            resolution = PermissionResolution(
-                message = "「特殊用途的前台服务」已被限制，请前往特权服务重新授权",
-                confirmText = "去授权",
-                navigateToPrivilegeService = true,
-            ),
-        )
-    }
-
     // https://github.com/orgs/gkd-kit/discussions/1234
     private fun checkAccessA11y(): Boolean {
         return checkAllowedOp(AppOpsManagerHidden.OPSTR_ACCESS_ACCESSIBILITY)
@@ -140,35 +85,26 @@ object PermissionStates {
     }
 
     val appOpsRestrictedFlow by lazy {
-        combine(
-            appOpsAllowed.stateFlow,
-            foregroundServiceSpecialUse.stateFlow,
-        ) { appOpsAllowed, foregroundServiceSpecialUseAllowed ->
-            !appOpsAllowed || !foregroundServiceSpecialUseAllowed
-        }.stateIn(appScope, SharingStarted.Eagerly, false)
-    }
-
-    val notification by lazy {
-        requestablePermissionState(
-            name = "通知权限",
-            purpose = "用于显示后台服务运行状态与必要通知",
-            permission = PermissionLists.getPostNotificationsPermission(),
-        )
+        appOpsAllowed.stateFlow.map { !it }
+            .stateIn(appScope, SharingStarted.Eagerly, false)
     }
 
     val localNetwork by lazy {
-        requestablePermissionState(
+        PermissionState(
             name = "访问本地网络权限",
-            purpose = "用于通过无线调试连接特权服务",
-            permission = PermissionLists.getAccessLocalNetworkPermission(),
+            check = {
+                !AndroidTarget.CINNAMON_BUN ||
+                    app.checkGrantedPermission(Manifest.permission.ACCESS_LOCAL_NETWORK)
+            },
         )
     }
 
     val queryPackages by lazy {
-        requestablePermissionState(
+        PermissionState(
             name = "读取应用列表权限",
-            purpose = "用于展示设备应用并匹配应用规则",
-            permission = PermissionLists.getGetInstalledAppsPermission(),
+            check = {
+                app.checkGrantedPermission("com.android.permission.GET_INSTALLED_APPS")
+            },
             onChanged = {
                 if (!updateAppMutex.mutex.isLocked) {
                     updateAllAppInfo()
@@ -178,24 +114,11 @@ object PermissionStates {
     }
 
     val drawOverlays by lazy {
-        requestablePermissionState(
+        PermissionState(
             name = "悬浮窗权限",
-            purpose = "用于在无障碍服务不可用时显示触发提示",
-            permission = PermissionLists.getSystemAlertWindowPermission(),
             check = {
                 // https://developer.android.com/security/fraud-prevention/activities?hl=zh-cn#hide_overlay_windows
                 Settings.canDrawOverlays(app)
-            },
-        )
-    }
-
-    val ignoreBatteryOptimizations by lazy {
-        requestablePermissionState(
-            name = "忽略电池优化权限",
-            purpose = "用于降低后台服务被系统休眠或终止的概率",
-            permission = PermissionLists.getRequestIgnoreBatteryOptimizationsPermission(),
-            check = {
-                app.powerManager.isIgnoringBatteryOptimizations(app.packageName)
             },
         )
     }
@@ -207,26 +130,13 @@ object PermissionStates {
         )
     }
 
-    val privilegeGranted by lazy {
-        PermissionState(
-            name = "特权服务",
-            check = {
-                privilegeContextFlow.value != null && Privilege.pingServer()
-            },
-        )
-    }
-
     val all by lazy {
         listOf(
-            notification,
             localNetwork,
-            foregroundServiceSpecialUse,
             appOpsAllowed,
             drawOverlays,
-            ignoreBatteryOptimizations,
             writeSecureSettings,
             queryPackages,
-            privilegeGranted,
         )
     }
 

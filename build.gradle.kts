@@ -17,7 +17,6 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlinx.atomicfu) apply false
     alias(libs.plugins.remap) apply false
-    alias(libs.plugins.loc) apply false
     alias(libs.plugins.littlerobots.version)
 }
 

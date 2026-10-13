@@ -32,12 +32,6 @@ fun BaseViewModel.subsAppActionOrderMapState(
         appIds.mapIndexed { index, appId -> appId to index }.toMap()
     }.stateLoadable()
 
-fun BaseViewModel.globalGroupAppOrderListState(
-    subsId: Long,
-    groupKey: Int,
-): StateFlow<Loadable<List<String>>> =
-    DbSet.actionLogDao.queryLatestUniqueAppIds(subsId, groupKey).stateLoadable()
-
 fun BaseViewModel.useAppFilter(
     mainVm: MainViewModel,
     appGroupType: (SettingsStore) -> Int,

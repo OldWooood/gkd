@@ -3,5 +3,4 @@
     <string name="app_name" debug_suffix="true">GKD</string>
     <string name="a11y_desc">跳过开屏广告的屏幕点击服务\n\n在应用打开时出现开屏广告界面时自动点击跳过</string>
     <string name="import_backup" debug_suffix="true">导入备份</string>
-    <string name="rule_match" debug_suffix="true">规则匹配</string>
 </resources>

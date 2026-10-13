@@ -41,9 +41,7 @@ import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.priv.PrivilegeServiceStatus
 import li.songe.gkd.priv.privilegeServiceStatusFlow
 import li.songe.gkd.service.A11yService
-import li.songe.gkd.service.StatusService
 import li.songe.gkd.service.switchAutomatorService
-import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.ActionLogRoute
 import li.songe.gkd.ui.AppConfigRoute
 import li.songe.gkd.ui.PrivilegeServiceRoute
@@ -62,7 +60,6 @@ import li.songe.gkd.ui.style.surfaceCardColors
 import li.songe.gkd.util.HOME_PAGE_URL
 import li.songe.gkd.util.latestRecordDescFlow
 import li.songe.gkd.util.latestRecordFlow
-import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.openA11ySettings
 import li.songe.gkd.util.throttle
 
@@ -72,7 +69,6 @@ fun useDashboardPage(): ScaffoldExt {
     val mainVm = LocalMainViewModel.current
     val vm = viewModel<DashboardVm>()
     val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
-    val store by storeFlow.collectAsStateWithLifecycle()
     val privilegeServiceStatus by privilegeServiceStatusFlow.collectAsStateWithLifecycle()
     val pageScrollState = rememberColumnScrollState()
     val scrollBehavior = pageScrollState.scrollBehavior
@@ -106,7 +102,6 @@ fun useDashboardPage(): ScaffoldExt {
             })
         }) { contentPadding ->
         val a11yRunning by A11yService.isRunning.collectAsStateWithLifecycle()
-        val manageRunning by StatusService.isRunning.collectAsStateWithLifecycle()
         val writeSecureSettings by PermissionStates.writeSecureSettings.stateFlow.collectAsStateWithLifecycle()
 
         Column(
@@ -162,22 +157,6 @@ fun useDashboardPage(): ScaffoldExt {
                         openA11ySettings()
                     } else {
                         switchAutomatorService()
-                    }
-                },
-            )
-
-            PageSwitchItemCard(
-                imageVector = PerfIcon.Notifications,
-                title = "常驻通知",
-                subtitle = "显示运行状态及统计数据",
-                checked = manageRunning && store.enableStatusService,
-                onCheckedChange = {
-                    if (it) {
-                        vm.scope.launchTry {
-                            StatusService.requestStart(mainVm)
-                        }
-                    } else {
-                        vm.stopStatusService()
                     }
                 },
             )
@@ -244,50 +223,6 @@ private fun PageItemCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun PageSwitchItemCard(
-    imageVector: ImageVector,
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val onClick = throttle { onCheckedChange(!checked) }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) {
-                this.onClick(label = "切换$title", action = null)
-            },
-        shape = MaterialTheme.shapes.large,
-        colors = surfaceCardColors,
-        onClick = onClick,
-    ) {
-        IconTextCard(
-            imageVector = imageVector,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            PerfSwitch(
-                checked = checked,
-                onCheckedChange = null,
-            )
         }
     }
 }

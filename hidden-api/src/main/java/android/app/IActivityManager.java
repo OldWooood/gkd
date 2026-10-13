@@ -1,7 +1,5 @@
 package android.app;
 
-import android.content.ComponentName;
-import android.content.Intent;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
@@ -28,10 +26,4 @@ public interface IActivityManager extends IInterface {
     void registerTaskStackListener(ITaskStackListener listener);
 
     void unregisterTaskStackListener(ITaskStackListener listener);
-
-    @DeprecatedSinceApi(api = Build.VERSION_CODES.R)
-    ComponentName startService(IApplicationThread caller, Intent service, String resolvedType, boolean requireForeground, String callingPackage, int userId);
-
-    @RequiresApi(Build.VERSION_CODES.R)
-    ComponentName startService(IApplicationThread caller, Intent service, String resolvedType, boolean requireForeground, String callingPackage, String callingFeatureId, int userId);
 }

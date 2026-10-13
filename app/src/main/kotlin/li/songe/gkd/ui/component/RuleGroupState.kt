@@ -16,7 +16,6 @@ import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.data.edit
 import li.songe.gkd.db.DbSet
-import li.songe.gkd.ui.UpsertRuleGroupRoute
 import li.songe.gkd.ui.style.scaffoldPadding
 import li.songe.gkd.util.SubscriptionStore
 import li.songe.gkd.util.getGroupEnable
@@ -225,16 +224,6 @@ class RuleGroupState(
                 group = showGroup,
                 appId = showGroupState.appId,
                 onDismissRequest = dismissGroupShow,
-                onClickEdit = {
-                    dismissGroupShow()
-                    mainVm.navigatePage(
-                        UpsertRuleGroupRoute(
-                            subsId = showGroupState.subsId,
-                            groupKey = showGroupState.groupKey,
-                            appId = showGroupState.appId,
-                        )
-                    )
-                },
                 onClickEditExclude = {
                     openExcludeEditor(showGroupState)
                 },

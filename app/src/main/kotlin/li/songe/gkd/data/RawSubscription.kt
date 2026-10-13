@@ -264,19 +264,9 @@ data class RawSubscription(
         val priorityActionMaximum: Int?
     }
 
-    @Serializable
-    data class SwipeArg(
-        val start: Position,
-        val end: Position?,
-        val duration: Long,
-    )
-
     interface LocationProps {
         // click
         val position: Position?
-
-        // swipe
-        val swipeArg: SwipeArg?
     }
 
     sealed interface RawRuleProps : RawCommonProps, LocationProps {
@@ -439,7 +429,6 @@ data class RawSubscription(
         override val preKeys: List<Int>?,
         override val action: String?,
         override val position: Position?,
-        override val swipeArg: SwipeArg?,
         override val matches: List<String>?,
         override val excludeMatches: List<String>?,
         override val excludeAllMatches: List<String>?,
@@ -498,7 +487,6 @@ data class RawSubscription(
         override val preKeys: List<Int>?,
         override val action: String?,
         override val position: Position?,
-        override val swipeArg: SwipeArg?,
         override val matches: List<String>?,
         override val excludeMatches: List<String>?,
         override val excludeAllMatches: List<String>?,
@@ -619,22 +607,6 @@ data class RawSubscription(
 
                 else -> null
             }
-        }
-
-        private fun getSwipeArg(
-            jsonObject: JsonObject?
-        ): SwipeArg? = when (val element = jsonObject?.get("swipeArg")) {
-            is JsonObject -> {
-                SwipeArg(
-                    start = getPosition(element["start"]?.jsonObject, true)
-                        ?: error("swipe start position is required"),
-                    end = getPosition(element["end"]?.jsonObject, true),
-                    duration = element["duration"]?.jsonPrimitive?.long
-                        ?: error("swipe duration is required"),
-                )
-            }
-
-            else -> null
         }
 
         private fun getStringIArray(jsonObject: JsonObject?, name: String): List<String>? {
@@ -803,7 +775,6 @@ data class RawSubscription(
                 versionCode = getCompatVersionCode(jsonObject),
                 versionName = getCompatVersionName(jsonObject),
                 position = getPosition(jsonObject),
-                swipeArg = getSwipeArg(jsonObject),
                 forcedTime = getLong(jsonObject, "forcedTime"),
                 priorityTime = getLong(jsonObject, "priorityTime"),
                 priorityActionMaximum = getInt(jsonObject, "priorityActionMaximum"),
@@ -917,7 +888,6 @@ data class RawSubscription(
                 order = getInt(jsonObject, "order"),
                 forcedTime = getLong(jsonObject, "forcedTime"),
                 position = getPosition(jsonObject),
-                swipeArg = getSwipeArg(jsonObject),
                 priorityTime = getLong(jsonObject, "priorityTime"),
                 priorityActionMaximum = getInt(jsonObject, "priorityActionMaximum"),
             )

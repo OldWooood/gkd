@@ -1,6 +1,5 @@
 package li.songe.gkd.priv
 
-import android.content.Intent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,7 +7,6 @@ import kotlinx.coroutines.withContext
 import li.songe.gkd.app
 import li.songe.gkd.appScope
 import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.service.StatusService
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.toast
@@ -53,11 +51,6 @@ private suspend fun updatePrivilegeContext(serverInfo: PrivilegeServerInfo?) =
             val privilegeContext = PrivilegeContext.create(serverInfo, userServiceConnection)
             privilegeContextFlow.value = privilegeContext
             PermissionStates.refreshAll()
-            if (StatusService.needRestart) {
-                privilegeContext.startForegroundService(
-                    Intent(app, StatusService::class.java),
-                )
-            }
             val delayMillis = if (app.justStarted) 1200L else 0L
             toast("特权服务连接成功", delayMillis = delayMillis)
         } else if (oldContext != null) {

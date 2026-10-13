@@ -13,7 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,10 +21,8 @@ import kotlinx.coroutines.sync.withLock
 import li.songe.gkd.a11y.topActivityFlow
 import li.songe.gkd.a11y.updateSystemDefaultAppId
 import li.songe.gkd.a11y.updateTopActivity
-import li.songe.gkd.permission.PermissionRequests
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.priv.privilegeContextFlow
-import li.songe.gkd.service.StatusService
 import li.songe.gkd.service.fixRestartAutomatorService
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.share.ActivityImeController
@@ -45,17 +42,14 @@ class MainActivity : ComponentActivity() {
     val mainVm by viewModels<MainViewModel>()
     val imeController = ActivityImeController(this)
     private val activityResultHost = ActivityResultRequests.Host(this)
-    private val permissionRequestHost = PermissionRequests.Host(this)
 
     var topBarWindowInsets by mutableStateOf(WindowInsets(top = BarUtils.getStatusBarHeight()))
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
         enableEdgeToEdge()
         fixSomeProblems()
         super.onCreate(savedInstanceState)
         activityResultHost.bind(mainVm.activityResults)
-        permissionRequestHost.bind(mainVm.permissionRequests)
         LogUtils.d()
         lifecycleScope.launch {
             storeFlow.mapState(lifecycleScope) { s -> s.excludeFromRecents }.collect {
@@ -68,7 +62,6 @@ class MainActivity : ComponentActivity() {
             mainVm.handleIntent(it)
             intent = null
         }
-        StatusService.autoStart()
         setContent {
             CompositionLocalProvider(
                 LocalMainViewModel provides mainVm,

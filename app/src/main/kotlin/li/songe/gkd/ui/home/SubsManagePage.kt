@@ -3,7 +3,6 @@ package li.songe.gkd.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,7 +49,6 @@ import li.songe.gkd.ui.component.SubsItemCard
 import li.songe.gkd.ui.component.TextMenu
 import li.songe.gkd.ui.component.TextSwitch
 import li.songe.gkd.ui.component.rememberMultiSelectionState
-import li.songe.gkd.ui.component.rememberReorderSession
 import li.songe.gkd.ui.component.rememberPinnedListScrollState
 import li.songe.gkd.ui.share.ListPlaceholder
 import li.songe.gkd.ui.share.Loadable
@@ -65,8 +63,6 @@ import li.songe.gkd.util.getUpDownTransform
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.throttle
 import li.songe.gkd.util.toast
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun useSubsManagePage(): ScaffoldExt {
@@ -123,8 +119,6 @@ private fun useLoadedSubsManagePage(
     val selectionState = rememberMultiSelectionState<Long>()
     val selectedIds = selectionState.selectedKeys
     val isSelectedMode = selectionState.active
-    val reorderSession = rememberReorderSession(subItems) { it.id }
-    val orderSubItems = reorderSession.items
     BackHandler(isSelectedMode) {
         selectionState.clear()
     }
@@ -344,10 +338,6 @@ private fun useLoadedSubsManagePage(
             )
         },
     ) { contentPadding ->
-        val reorderableLazyColumnState =
-            rememberReorderableLazyListState(lazyListState) { from, to ->
-                reorderSession.move(from.index, to.index)
-            }
         PullToRefreshBox(
             modifier = Modifier.padding(contentPadding),
             state = pullToRefreshState,
@@ -358,57 +348,24 @@ private fun useLoadedSubsManagePage(
                 state = lazyListState,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                itemsIndexed(orderSubItems, { _, subItem -> subItem.id }) { index, subItem ->
-                    val canDrag = !refreshing && orderSubItems.size > 1
-                    ReorderableItem(
-                        state = reorderableLazyColumnState,
-                        key = subItem.id,
-                        enabled = canDrag,
-                    ) {
-                        val interactionSource = remember { MutableInteractionSource() }
-                        SubsItemCard(
-                            modifier = Modifier.longPressDraggableHandle(
-                                enabled = canDrag,
-                                interactionSource = interactionSource,
-                                onDragStarted = {
-                                    reorderSession.startDragging()
-                                    if (orderSubItems.size > 1 && !isSelectedMode) {
-                                        selectionState.selectOnly(subItem.id)
-                                    }
-                                },
-                                onDragStopped = {
-                                    val result = reorderSession.finishDragging()
-                                    if (result.moved) {
-                                        selectionState.clear()
-                                    }
-                                    result.reorderedItems?.let { reorderedItems ->
-                                        val changedItems = reorderedItems.mapIndexedNotNull { index, item ->
-                                            item.copy(order = index).takeIf { it.order != item.order }
-                                        }
-                                        if (changedItems.isNotEmpty()) {
-                                            vm.updateOrder(changedItems)
-                                        }
-                                    }
-                                },
-                            ),
-                            interactionSource = interactionSource,
-                            subsItem = subItem,
-                            subscription = subsIdToRaw[subItem.id],
-                            index = index + 1,
-                            isSelectedMode = isSelectedMode,
-                            isSelected = selectedIds.contains(subItem.id),
-                            loadError = state.loadErrors[subItem.id],
-                            refreshError = state.refreshErrors[subItem.id],
-                            refreshing = refreshing,
-                            onOpen = {
-                                mainVm.subsSheet.show(subItem.id)
-                            },
-                            onCheckedChange = { checked ->
-                                vm.requestSubscriptionEnabled(subItem, checked)
-                            },
-                            onSelectedChange = { selectionState.toggle(subItem.id) },
-                        )
-                    }
+                itemsIndexed(subItems, { _, subItem -> subItem.id }) { index, subItem ->
+                    SubsItemCard(
+                        subsItem = subItem,
+                        subscription = subsIdToRaw[subItem.id],
+                        index = index + 1,
+                        isSelectedMode = isSelectedMode,
+                        isSelected = selectedIds.contains(subItem.id),
+                        loadError = state.loadErrors[subItem.id],
+                        refreshError = state.refreshErrors[subItem.id],
+                        refreshing = refreshing,
+                        onOpen = {
+                            mainVm.subsSheet.show(subItem.id)
+                        },
+                        onCheckedChange = { checked ->
+                            vm.requestSubscriptionEnabled(subItem, checked)
+                        },
+                        onSelectedChange = { selectionState.toggle(subItem.id) },
+                    )
                 }
                 item(ListPlaceholder.KEY, ListPlaceholder.TYPE) {
                     Spacer(modifier = Modifier.height(EmptyHeight))

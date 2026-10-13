@@ -5,7 +5,6 @@ import kotlinx.coroutines.flow.update
 import li.songe.gkd.appScope
 import li.songe.gkd.util.AppListString
 import li.songe.gkd.util.launchTry
-import li.songe.gkd.util.toast
 
 val storeFlow by lazy {
     createAnyFlow(
@@ -39,15 +38,6 @@ fun initStore() = appScope.launchTry(Dispatchers.IO) {
     storeFlow.value
     actionCountFlow.value
     blockMatchAppListFlow.value
-}
-
-fun switchStoreEnableMatch() {
-    if (storeFlow.value.enableMatch) {
-        toast("暂停规则匹配")
-    } else {
-        toast("开启规则匹配")
-    }
-    storeFlow.update { it.copy(enableMatch = !it.enableMatch) }
 }
 
 fun updateEnableAutomator(value: Boolean) {

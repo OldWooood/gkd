@@ -23,8 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import li.songe.gkd.data.AppInfo
-import li.songe.gkd.data.otherUserMapFlow
-import li.songe.gkd.priv.currentUserId
 import li.songe.gkd.util.appInfoMapFlow
 
 @Composable
@@ -39,15 +37,7 @@ fun AppNameText(
     val info = appInfo ?: appInfoMapFlow.collectAsStateWithLifecycle().value[appId]
     val showSystemIcon = info?.isSystem == true
     val appName = (info?.name ?: fallbackName ?: appId ?: error("appId is required"))
-    val userName = info?.userId?.let { userId ->
-        if (userId == currentUserId) {
-            null
-        } else {
-            val userInfo = otherUserMapFlow.collectAsStateWithLifecycle().value[userId]
-            "「${userInfo?.name ?: userId}」"
-        }
-    }
-    if (!showSystemIcon && userName == null) {
+    if (!showSystemIcon) {
         Text(
             modifier = modifier,
             text = appName,
@@ -58,49 +48,31 @@ fun AppNameText(
             color = color,
         )
     } else {
-        val userNameColor = MaterialTheme.colorScheme.tertiary
-        val annotatedString = remember(showSystemIcon, appName, userName, userNameColor) {
+        val annotatedString = remember(showSystemIcon, appName) {
             buildAnnotatedString {
-                if (showSystemIcon) {
-                    appendInlineContent("icon")
-                }
+                appendInlineContent("icon")
                 append(appName)
-                if (userName != null) {
-                    append(" ")
-                    withStyle(
-                        style = SpanStyle(
-                            fontWeight = FontWeight.Bold,
-                            color = userNameColor,
-                        )
-                    ) {
-                        append(userName)
-                    }
-                }
             }
         }
-        val inlineContent = if (showSystemIcon) {
-            val contentColor = style.color.takeOrElse { LocalContentColor.current }
-            remember(style, contentColor) {
-                mapOf(
-                    "icon" to InlineTextContent(
-                        placeholder = Placeholder(
-                            width = style.fontSize,
-                            height = style.lineHeight,
-                            placeholderVerticalAlign = PlaceholderVerticalAlign.Center
-                        )
-                    ) {
-                        PerfIcon(
-                            imageVector = PerfIcon.VerifiedUser,
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.extraSmall)
-                                .fillMaxSize(),
-                            tint = contentColor
-                        )
-                    }
-                )
-            }
-        } else {
-            emptyMap()
+        val contentColor = style.color.takeOrElse { LocalContentColor.current }
+        val inlineContent = remember(style, contentColor) {
+            mapOf(
+                "icon" to InlineTextContent(
+                    placeholder = Placeholder(
+                        width = style.fontSize,
+                        height = style.lineHeight,
+                        placeholderVerticalAlign = PlaceholderVerticalAlign.Center
+                    )
+                ) {
+                    PerfIcon(
+                        imageVector = PerfIcon.VerifiedUser,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.extraSmall)
+                            .fillMaxSize(),
+                        tint = contentColor
+                    )
+                }
+            )
         }
         Text(
             modifier = modifier,

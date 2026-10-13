@@ -24,20 +24,17 @@ import kotlinx.coroutines.MainScope
 import kotlinx.serialization.Serializable
 import li.songe.gkd.a11y.initA11yFeat
 import li.songe.gkd.data.selfAppInfo
-import li.songe.gkd.notif.NotificationChannels
-import li.songe.gkd.priv.gkdPrivilegeUiConfig
 import li.songe.gkd.priv.initPrivilege
+import li.songe.gkd.priv.shizuku.ShizukuPrivilegeController
 import li.songe.gkd.store.initStore
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.PKG_FLAGS
 import li.songe.gkd.util.initAppState
 import li.songe.gkd.util.SubscriptionStore
-import li.songe.gkd.util.initToast
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.toast
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import priv.kit.core.PrivilegeConfig
-import priv.kit.ui.PrivilegeUi
 import kotlin.system.exitProcess
 
 
@@ -206,14 +203,12 @@ class App : Application() {
                 exitProcess(0)
             }
         }
-        initToast()
         initStore()
-        NotificationChannels.initialize()
         initAppState()
         initA11yFeat()
         initPrivilege()
         appScope.launchTry(Dispatchers.IO) {
-            PrivilegeUi.startSilently(gkdPrivilegeUiConfig)
+            ShizukuPrivilegeController.startSilently(this@App)
         }
         appScope.launchTry(Dispatchers.IO) {
             SubscriptionStore.initialize()

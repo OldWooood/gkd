@@ -10,15 +10,9 @@ import li.songe.gkd.util.Option
 class AboutVm : BaseViewModel() {
     val showInfoDlgFlow: StateFlow<Boolean>
         field = MutableStateFlow(false)
-    val showShareAppDlgFlow: StateFlow<Boolean>
-        field = MutableStateFlow(false)
 
     fun setInfoDialogVisible(visible: Boolean) {
         showInfoDlgFlow.value = visible
-    }
-
-    fun setShareAppDialogVisible(visible: Boolean) {
-        showShareAppDlgFlow.value = visible
     }
 
     fun setUpdateChannel(value: Option<Int>) {

@@ -1,7 +1,6 @@
 package li.songe.gkd.util
 
 import android.content.ClipData
-import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Outline
@@ -19,8 +18,6 @@ import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
-import com.hjq.toast.Toaster
-import com.hjq.toast.style.WhiteToastStyle
 import li.songe.gkd.app
 import li.songe.gkd.data.ResolvedRule
 import li.songe.gkd.isActivityVisible
@@ -28,13 +25,12 @@ import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.storeFlow
-import li.songe.loc.Loc
 
 fun toast(
     text: CharSequence,
     forced: Boolean = false,
     delayMillis: Long = 0L,
-    @Loc loc: String = "",
+    loc: String = "",
 ) {
     if (delayMillis > 0) {
         runMainPost(delayMillis) {
@@ -43,7 +39,7 @@ fun toast(
         return
     }
     if (forced || isActivityVisible) {
-        Toaster.show(text)
+        showSystemToast(text)
     }
     if (loc.isNotEmpty()) {
         LogUtils.d(text, loc = loc)
@@ -51,7 +47,7 @@ fun toast(
 }
 
 private val darkTheme: Boolean
-    get() = storeFlow.value.enableDarkTheme ?: app.resources.configuration.let {
+    get() = app.resources.configuration.let {
         it.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
     }
 
@@ -97,21 +93,6 @@ private fun View.updateToastView() {
     outlineProvider = circleOutlineProvider
     clipToOutline = true
     elevation = 2.dp.px
-    outlineProvider = circleOutlineProvider
-    clipToOutline = true
-}
-
-private fun setReactiveToastStyle() {
-    Toaster.setStyle(object : WhiteToastStyle() {
-        override fun getGravity() = Gravity.BOTTOM
-        override fun getYOffset() = toastYOffset
-        override fun getTranslationZ(context: Context?) = 0f
-        override fun createView(context: Context?): View {
-            return super.createView(context).apply {
-                updateToastView()
-            }
-        }
-    })
 }
 
 private var triggerTime = 0L
@@ -126,11 +107,7 @@ fun showActionToast(rule: ResolvedRule) {
                 .replace($$"${1}", rule.rule.name.toString())
                 .replace($$"${2}", rule.g.group.name)
                 .replace($$"${3}", actionCountFlow.value.toString())
-            if (storeFlow.value.useSystemToast) {
-                showSystemToast(text)
-            } else {
-                showA11yToast(text)
-            }
+            showA11yToast(text)
         }
     }
 }
@@ -191,11 +168,4 @@ private fun showA11yToast(message: CharSequence) {
 fun copyText(text: String) {
     app.clipboardManager.setPrimaryClip(ClipData.newPlainText(app.packageName, text))
     toast("复制成功")
-}
-
-fun initToast() {
-    Toaster.init(app)
-    Toaster.setDebugMode(false)
-    Toaster.setInterceptor { false } // 覆盖默认拦截器
-    setReactiveToastStyle()
 }

@@ -25,25 +25,14 @@ import li.songe.gkd.util.throttle
 
 private data class TextDialogRequest(
     val text: String,
-    val openable: Boolean,
 )
 
 class TextDialogState {
     private val requestFlow = MutableStateFlow<TextDialogRequest?>(null)
 
-    fun showText(text: String) {
-        requestFlow.value = TextDialogRequest(
-            text = text,
-            openable = false,
-        )
-    }
-
     fun showUrl(url: String) {
         if (URLUtil.isNetworkUrl(url)) {
-            requestFlow.value = TextDialogRequest(
-                text = url,
-                openable = true,
-            )
+            requestFlow.value = TextDialogRequest(text = url)
         } else {
             openUri(url)
         }
@@ -67,7 +56,7 @@ class TextDialogState {
             AppAlertDialog(
                 onDismissRequest = ::dismiss,
                 title = {
-                    Text(text = if (currentRequest.openable) "查看链接" else "查看文本")
+                    Text(text = "查看链接")
                 },
                 text = {
                     Surface(
@@ -103,10 +92,8 @@ class TextDialogState {
                         TextButton(onClick = throttle(::dismiss)) {
                             Text(text = "关闭")
                         }
-                        if (currentRequest.openable) {
-                            TextButton(onClick = throttle { open(currentRequest) }) {
-                                Text(text = "打开")
-                            }
+                        TextButton(onClick = throttle { open(currentRequest) }) {
+                            Text(text = "打开")
                         }
                     }
                 },

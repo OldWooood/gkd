@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import kotlinx.serialization.Serializable
 import li.songe.gkd.app
-import li.songe.gkd.priv.currentUserId
 import li.songe.gkd.priv.toHidden
 import li.songe.gkd.util.pkgIcon
 
@@ -20,17 +19,15 @@ data class AppInfo(
     val isSystem: Boolean,
     val mtime: Long,
     val hidden: Boolean,
-    val userId: Int,
 ) {
     override fun equals(other: Any?): Boolean {
         if (other !is AppInfo) return false
-        return id == other.id && mtime == other.mtime && userId == other.userId
+        return id == other.id && mtime == other.mtime
     }
 
     override fun hashCode(): Int {
         var result = id.hashCode()
         result = 31 * result + mtime.hashCode()
-        result = 31 * result + userId
         return result
     }
 }
@@ -62,12 +59,10 @@ private fun checkHasActivity(packageName: String): Boolean {
 
 // all->433 isOverlay->354 checkAppHasActivity->271
 fun PackageInfo.toAppInfo(
-    userId: Int = currentUserId,
     hidden: Boolean? = null,
 ): AppInfo {
     val isSystem = applicationInfo?.isSystem ?: false
     return AppInfo(
-        userId = userId,
         id = packageName,
         versionCode = compatVersionCode,
         versionName = versionName,
@@ -81,10 +76,9 @@ fun PackageInfo.toAppInfo(
 }
 
 fun PackageInfo.toAppInfoAndIcon(
-    userId: Int = currentUserId,
     hidden: Boolean? = null,
 ): Pair<AppInfo, Drawable?> {
-    val appInfo = toAppInfo(userId, hidden)
+    val appInfo = toAppInfo(hidden)
     return if (appInfo.hidden) {
         appInfo to null
     } else {

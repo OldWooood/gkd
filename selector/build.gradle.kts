@@ -5,21 +5,7 @@ plugins {
 
 kotlin {
     jvm {}
-    js {
-        compilerOptions {
-            target.set("es2015")
-        }
-        binaries.executable()
-        useEsModules()
-        generateTypeScriptDefinitions()
-        browser {}
-    }
     sourceSets {
-        all {
-            languageSettings.optIn("kotlin.js.ExperimentalJsExport")
-            languageSettings.optIn("kotlin.js.ExperimentalJsStatic")
-            languageSettings.optIn("kotlin.js.ExperimentalJsCollectionsApi")
-        }
         commonMain {
             dependencies {
                 implementation(libs.kotlin.stdlib)

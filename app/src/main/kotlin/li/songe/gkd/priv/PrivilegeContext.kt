@@ -3,13 +3,10 @@ package li.songe.gkd.priv
 import android.Manifest
 import android.app.AppOpsManager
 import android.app.AppOpsManagerHidden
-import android.content.Intent
 import android.content.pm.PackageInfo
 import android.os.Process
-import com.hjq.permissions.permission.dangerous.GetInstalledAppsPermission
 import li.songe.gkd.META
 import li.songe.gkd.app
-import li.songe.gkd.data.UserInfo
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.util.AndroidTarget
 import priv.kit.core.Privilege
@@ -22,11 +19,9 @@ class PrivilegeContext private constructor(
 ) {
     val serverLifecycleBinder = Privilege.getServerLifecycleBinder()
     private val packageManager = CompatPackageManager()
-    private val userManager = CompatUserManager()
     private val activityManager = CompatActivityManager()
     private val appOpsService = CompatAppOpsService()
     private val inputManager = CompatInputManager()
-    private val wmManager = CompatWindowManager()
     private var taskStackListenerRegistered = false
 
     private fun initialize() {
@@ -52,27 +47,8 @@ class PrivilegeContext private constructor(
         allowAllSelfPermission()
     }
 
-    fun startForegroundService(intent: Intent) {
-        // 被启动的服务必须设置 android:exported="true"
-        // https://github.com/android-cs/16/blob/main/services/core/java/com/android/server/am/ActivityManagerShellCommand.java#L982
-        activityManager.startService(
-            intent = intent,
-            requireForeground = true,
-            callingPackage = "com.android.shell",
-            callingFeatureId = null,
-        )
-    }
-
     fun topTask() = activityManager.getTasks().firstOrNull()
     fun topCpn() = topTask()?.topActivity
-
-    fun getUsers(
-        excludePartial: Boolean = true,
-        excludeDying: Boolean = true,
-        excludePreCreated: Boolean = true,
-    ): List<UserInfo> {
-        return userManager.getUsers(excludePartial, excludeDying, excludePreCreated)
-    }
 
     fun getInstalledPackagesAsUser(
         flags: Int,
@@ -83,32 +59,6 @@ class PrivilegeContext private constructor(
 
     fun tap(x: Float, y: Float, duration: Long = 0): Boolean {
         return inputManager.tap(x, y, duration)
-    }
-
-    fun swipe(
-        x1: Float,
-        y1: Float,
-        x2: Float,
-        y2: Float,
-        duration: Long,
-    ): Boolean {
-        return inputManager.swipe(x1, y1, x2, y2, duration)
-    }
-
-    fun keyevent(keyCode: Int): Boolean {
-        return inputManager.keyevent(keyCode)
-    }
-
-    fun isRotationFrozen(): Boolean = wmManager.value.isRotationFrozen
-
-    fun getDefaultDisplayRotation(): Int = wmManager.value.defaultDisplayRotation
-
-    fun freezeRotation(rotation: Int, caller: String) {
-        wmManager.freezeRotation(rotation, caller)
-    }
-
-    fun thawRotation(caller: String) {
-        wmManager.thawRotation(caller)
     }
 
     private fun setAllowSelfMode(code: Int) {
@@ -124,11 +74,9 @@ class PrivilegeContext private constructor(
     }
 
     private fun allowAllSelfMode() {
-        setAllowSelfMode(AppOpsManagerHidden.OP_POST_NOTIFICATION)
         setAllowSelfMode(AppOpsManagerHidden.OP_SYSTEM_ALERT_WINDOW)
         setAllowSelfMode(AppOpsManagerHidden.OP_ACCESS_ACCESSIBILITY)
         setAllowSelfMode(AppOpsManagerHidden.OP_ACCESS_RESTRICTED_SETTINGS)
-        setAllowSelfMode(AppOpsManagerHidden.OP_FOREGROUND_SERVICE_SPECIAL_USE)
     }
 
     private fun grantSelfPermission(name: String) {
@@ -141,11 +89,10 @@ class PrivilegeContext private constructor(
 
     private fun allowAllSelfPermission() {
         if (!PermissionStates.queryPackages.value) {
-            grantSelfPermission(GetInstalledAppsPermission.PERMISSION_NAME)
+            grantSelfPermission("com.android.permission.GET_INSTALLED_APPS")
         }
         grantSelfPermission(PermissionStates.Manifest_permission_GET_APP_OPS_STATS)
         grantSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
-        grantSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
         if (AndroidTarget.CINNAMON_BUN) {
             grantSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK)
         }

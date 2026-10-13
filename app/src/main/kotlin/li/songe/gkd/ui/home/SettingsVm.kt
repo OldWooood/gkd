@@ -1,56 +1,19 @@
 package li.songe.gkd.ui.home
 
-import android.net.Uri
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.withContext
-import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.share.BaseViewModel
-import li.songe.gkd.util.BackupUtils
-import li.songe.gkd.util.getSubsStatus
-import li.songe.gkd.util.ruleSummaryFlow
-import java.io.File
 
 class SettingsVm : BaseViewModel() {
 
     val showActionToastDialogFlow: StateFlow<Boolean>
         field = MutableStateFlow(false)
-    val showNotificationTextDialogFlow: StateFlow<Boolean>
-        field = MutableStateFlow(false)
-    val showBackupDialogFlow: StateFlow<Boolean>
-        field = MutableStateFlow(false)
-    val showExportBackupDialogFlow: StateFlow<Boolean>
-        field = MutableStateFlow(false)
-    val toastSettingsDialogVisibleFlow: StateFlow<Boolean>
-        field = MutableStateFlow(false)
 
     fun setActionToastDialogVisible(visible: Boolean) {
         showActionToastDialogFlow.value = visible
     }
-
-    fun setNotificationTextDialogVisible(visible: Boolean) {
-        showNotificationTextDialogFlow.value = visible
-    }
-
-    fun setBackupDialogVisible(visible: Boolean) {
-        showBackupDialogFlow.value = visible
-    }
-
-    fun setExportBackupDialogVisible(visible: Boolean) {
-        showExportBackupDialogFlow.value = visible
-    }
-
-    fun setToastSettingsDialogVisible(visible: Boolean) {
-        toastSettingsDialogVisibleFlow.value = visible
-    }
-
-    val subsStatusFlow = combine(ruleSummaryFlow, actionCountFlow) { ruleSummary, count ->
-        getSubsStatus(ruleSummary, count)
-    }.stateInit(getSubsStatus(ruleSummaryFlow.value, actionCountFlow.value))
 
     fun saveActionToast(value: String): Boolean {
         if (value == storeFlow.value.actionToast) return false
@@ -58,49 +21,11 @@ class SettingsVm : BaseViewModel() {
         return true
     }
 
-    fun saveNotificationText(title: String, text: String): Boolean {
-        val store = storeFlow.value
-        if (store.customNotifTitle == title && store.customNotifText == text) return false
-        storeFlow.update {
-            it.copy(
-                customNotifTitle = title,
-                customNotifText = text,
-            )
-        }
-        return true
-    }
-
     fun setToastWhenClick(enabled: Boolean) {
         storeFlow.update { it.copy(toastWhenClick = enabled) }
     }
 
-    fun setUseSystemToast(enabled: Boolean) {
-        storeFlow.update { it.copy(useSystemToast = enabled) }
-    }
-
-    fun setUseCustomNotificationText(enabled: Boolean) {
-        storeFlow.update { it.copy(useCustomNotifText = enabled) }
-    }
-
     fun setExcludeFromRecents(enabled: Boolean) {
         storeFlow.update { it.copy(excludeFromRecents = enabled) }
-    }
-
-    fun setDarkTheme(value: Boolean?) {
-        storeFlow.update { it.copy(enableDarkTheme = value) }
-    }
-
-    fun setDynamicColor(enabled: Boolean) {
-        storeFlow.update { it.copy(enableDynamicColor = enabled) }
-    }
-
-    suspend fun importBackup(uri: Uri) {
-        withContext(Dispatchers.IO) {
-            BackupUtils.importBackUpData(uri)
-        }
-    }
-
-    suspend fun exportBackup(): File = withContext(Dispatchers.IO) {
-        BackupUtils.exportBackUpData()
     }
 }

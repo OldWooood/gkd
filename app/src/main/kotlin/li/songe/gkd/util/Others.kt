@@ -5,9 +5,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
@@ -22,7 +20,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.ui.unit.sp
 import androidx.core.graphics.get
 import kotlinx.serialization.json.JsonElement
 import li.songe.gkd.META
@@ -92,24 +89,6 @@ inline fun <reified T> toJson5String(value: T): String {
         return Json5.encodeToString(value, defaultJson5Config)
     }
     return json.encodeToJson5String(value, defaultJson5Config)
-}
-
-fun drawTextToBitmap(text: String, bitmap: Bitmap) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 32.sp.px
-        color = Color.BLUE
-        textAlign = Paint.Align.CENTER
-    }
-    val canvas = Canvas(bitmap)
-    val strList = text.split('\n')
-    strList.forEachIndexed { i, str ->
-        canvas.drawText(
-            str,
-            bitmap.width / 2f,
-            (bitmap.height / 2f) + (i - strList.size / 2f) * (paint.textSize + 4.sp.px),
-            paint
-        )
-    }
 }
 
 // https://github.com/gkd-kit/gkd/issues/924
@@ -222,10 +201,4 @@ fun runMainPost(delayMillis: Long = 0L, r: Runnable) {
         return
     }
     Handler(Looper.getMainLooper()).postDelayed(r, delayMillis)
-}
-
-fun getShareApkFile(): File {
-    return sharedDir.resolve("gkd-v${META.versionName}.apk").apply {
-        File(app.packageCodePath).copyTo(this, overwrite = true)
-    }
 }

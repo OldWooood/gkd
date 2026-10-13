@@ -2,7 +2,6 @@ package li.songe.gkd.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
@@ -49,11 +47,10 @@ import li.songe.gkd.MainActivity
 import li.songe.gkd.R
 import li.songe.gkd.data.AppInfo
 import li.songe.gkd.permission.PermissionStates
+import li.songe.gkd.store.blockMatchAppListFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.AppConfigRoute
-import li.songe.gkd.ui.EditBlockAppListRoute
 import li.songe.gkd.ui.component.AnimatedIconButton
-import li.songe.gkd.ui.component.AnimationFloatingActionButton
 import li.songe.gkd.ui.component.AppBarTextField
 import li.songe.gkd.ui.component.AppIcon
 import li.songe.gkd.ui.component.AppNameText
@@ -76,7 +73,6 @@ import li.songe.gkd.ui.style.appItemPadding
 import li.songe.gkd.util.AppGroupOption
 import li.songe.gkd.util.AppSortOption
 import li.songe.gkd.util.findOption
-import li.songe.gkd.util.getUpDownTransform
 import li.songe.gkd.util.launchAsFn
 import li.songe.gkd.util.throttle
 
@@ -100,7 +96,6 @@ fun useAppListPage(): ScaffoldExt {
     val showSearchBar = state.showSearchBar
     val refreshing = state.refreshing
     val pullToRefreshState = rememberPullToRefreshState()
-    val editWhiteListMode = state.editWhiteListMode
     val pageScrollState = rememberListScrollState()
     val scrollBehavior = pageScrollState.scrollBehavior
     val listState = pageScrollState.listState
@@ -147,25 +142,10 @@ fun useAppListPage(): ScaffoldExt {
                                 pageScrollState.resetScroll()
                             }
                         )
-                    if (editWhiteListMode) {
-                        BackHandler(onBack = vm::closeEditWhiteListMode)
-                    }
-                    AnimatedContent(
-                        targetState = editWhiteListMode,
-                        transitionSpec = { getUpDownTransform() },
-                    ) { localEditWhiteListMode ->
-                        if (localEditWhiteListMode) {
-                            Text(
-                                modifier = titleModifier,
-                                text = "应用白名单",
-                            )
-                        } else {
-                            Text(
-                                modifier = titleModifier,
-                                text = BottomNavItem.AppList.label,
-                            )
-                        }
-                    }
+                    Text(
+                        modifier = titleModifier,
+                        text = BottomNavItem.AppList.label,
+                    )
                 }
             }, actions = {
                 if (state.queryPackagesAbnormal) {
@@ -182,19 +162,6 @@ fun useAppListPage(): ScaffoldExt {
                         )
                     }
                 }
-                PerfIconButton(
-                    imageVector = PerfIcon.Block,
-                    contentDescription = "切换白名单编辑模式",
-                    onClickLabel = if (editWhiteListMode) "退出编辑" else "进入编辑",
-                    colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = if (editWhiteListMode) {
-                            CheckboxDefaults.colors().checkedBoxColor
-                        } else {
-                            LocalContentColor.current
-                        }
-                    ),
-                    onClick = throttle(vm::toggleEditWhiteListMode),
-                )
                 AnimatedIconButton(
                     onClick = throttle(vm::toggleSearch),
                     id = R.drawable.ic_anim_search_close,
@@ -250,16 +217,6 @@ fun useAppListPage(): ScaffoldExt {
                 }
             })
         },
-        floatingActionButton = {
-            AnimationFloatingActionButton(
-                visible = editWhiteListMode,
-                contentDescription = "编辑白名单",
-                onClick = {
-                    mainVm.navigatePage(EditBlockAppListRoute)
-                },
-                imageVector = PerfIcon.Edit,
-            )
-        }
     ) { contentPadding ->
         PullToRefreshBox(
             modifier = Modifier.padding(contentPadding),
@@ -278,7 +235,6 @@ fun useAppListPage(): ScaffoldExt {
                 }
                 items(appInfos, { it.id }) { appInfo ->
                     val desc = run {
-                        if (editWhiteListMode) return@run null
                         val appGroups = ruleSummary.appIdToAllGroups[appInfo.id] ?: emptyList()
                         val appDesc = if (appGroups.isNotEmpty()) {
                             when (val disabledCount = appGroups.count { g -> !g.enable }) {
@@ -304,15 +260,9 @@ fun useAppListPage(): ScaffoldExt {
                     AppItemCard(
                         appInfo = appInfo,
                         desc = desc,
-                        editWhiteListMode = editWhiteListMode,
-                        inWhiteList = appInfo.id in state.whiteListAppIds,
                         onClick = {
-                            if (editWhiteListMode) {
-                                vm.toggleWhiteList(appInfo.id)
-                            } else {
-                                context.imeController.requestHide()
-                                mainVm.navigatePage(AppConfigRoute(appInfo.id))
-                            }
+                            context.imeController.requestHide()
+                            mainVm.navigatePage(AppConfigRoute(appInfo.id))
                         },
                     )
                 }
@@ -332,26 +282,15 @@ fun useAppListPage(): ScaffoldExt {
 private fun AppItemCard(
     appInfo: AppInfo,
     desc: String?,
-    editWhiteListMode: Boolean,
-    inWhiteList: Boolean,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .clickable(onClick = throttle(onClick))
             .clearAndSetSemantics {
-                contentDescription = if (editWhiteListMode) {
-                    appInfo.name
-                } else {
-                    "应用：${appInfo.name}，${desc ?: appInfo.id}"
-                }
-                if (inWhiteList) {
-                    stateDescription = "已加入白名单"
-                } else if (editWhiteListMode) {
-                    stateDescription = "未加入白名单"
-                }
+                contentDescription = "应用：${appInfo.name}，${desc ?: appInfo.id}"
                 onClick(
-                    label = if (editWhiteListMode) if (inWhiteList) "从白名单中移除" else "加入白名单" else "进入规则汇总页面",
+                    label = "进入规则汇总页面",
                     action = null
                 )
             }
@@ -375,12 +314,7 @@ private fun AppItemCard(
                 softWrap = false
             )
         }
-        if (editWhiteListMode) {
-            PerfCheckbox(
-                key = appInfo.id,
-                checked = inWhiteList,
-            )
-        } else if (inWhiteList) {
+        if (appInfo.id in blockMatchAppListFlow.value) {
             PerfIcon(
                 modifier = Modifier
                     .padding(2.dp)

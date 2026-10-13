@@ -1,38 +1,48 @@
 package li.songe.gkd.ui
 
-import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import li.songe.gkd.priv.gkdPrivilegeUiConfig
+import li.songe.gkd.priv.privilegeDesiredEnabledFlow
+import li.songe.gkd.priv.shizuku.ShizukuPrivilegeController
 import li.songe.gkd.ui.component.AppAlertDialog
 import li.songe.gkd.ui.component.PerfIcon
 import li.songe.gkd.ui.component.PerfIconButton
 import li.songe.gkd.ui.component.PerfTopAppBar
 import li.songe.gkd.ui.share.LocalMainViewModel
+import li.songe.gkd.ui.style.EmptyHeight
+import li.songe.gkd.ui.style.itemHorizontalPadding
+import li.songe.gkd.ui.style.titleItemPadding
 import li.songe.gkd.util.throttle
-import priv.kit.ui.PrivilegeScaffold
-import priv.kit.ui.PrivilegeUiViewModel
+import priv.kit.core.Privilege
 
 @Serializable
 data object PrivilegeServiceRoute : NavKey
@@ -40,21 +50,24 @@ data object PrivilegeServiceRoute : NavKey
 @Composable
 fun PrivilegeServicePage() {
     val mainVm = LocalMainViewModel.current
-    val application = LocalContext.current.applicationContext as Application
-    val privilegeVm = viewModel {
-        GkdPrivilegeUiViewModel(application) {
-            mainVm.popPage()
-        }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val serverInfo by Privilege.serverState.collectAsStateWithLifecycle()
+    val desired by privilegeDesiredEnabledFlow.collectAsStateWithLifecycle()
+    var shizukuState by remember { mutableStateOf(ShizukuPrivilegeController.state()) }
+    var busy by remember { mutableStateOf(false) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(serverInfo) {
+        shizukuState = ShizukuPrivilegeController.state()
     }
-    val showInfoDialog by privilegeVm.showInfoDialogFlow.collectAsStateWithLifecycle()
+
     if (showInfoDialog) {
-        PrivilegeServiceInfoDialog(
-            onDismissRequest = { privilegeVm.setInfoDialogVisible(false) },
-        )
+        PrivilegeServiceInfoDialog(onDismissRequest = { showInfoDialog = false })
     }
-    PrivilegeScaffold(
-        modifier = Modifier.fillMaxSize(),
-        viewModel = privilegeVm,
+
+    Scaffold(
         topBar = {
             PerfTopAppBar(
                 navigationIcon = {
@@ -71,50 +84,184 @@ fun PrivilegeServicePage() {
                         imageVector = PerfIcon.Info,
                         contentDescription = "页面说明",
                         onClick = throttle {
-                            privilegeVm.setInfoDialogVisible(true)
+                            showInfoDialog = true
                         },
                     )
                 },
             )
         },
-    )
+    ) { contentPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(contentPadding)
+                .padding(horizontal = itemHorizontalPadding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "服务状态",
+                modifier = Modifier.titleItemPadding(showTop = false),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            StatusCard(
+                title = if (serverInfo != null) "特权服务已连接" else "特权服务未连接",
+                desc = when {
+                    serverInfo != null -> "uid=${serverInfo?.uid}  pid=${serverInfo?.pid}"
+                    desired -> "已配置自动连接，等待 Shizuku 或应用启动后重试"
+                    else -> "点击下方按钮启动特权服务"
+                },
+                error = serverInfo == null && desired,
+            )
+
+            Text(
+                text = "Shizuku",
+                modifier = Modifier.titleItemPadding(),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            StatusCard(
+                title = shizukuState.message,
+                desc = buildString {
+                    if (shizukuState.uid != null) {
+                        append("uid=${shizukuState.uid}")
+                    }
+                    if (shizukuState.version != null) {
+                        if (isNotEmpty()) append("  ")
+                        append("version=${shizukuState.version}")
+                    }
+                }.takeIf { it.isNotEmpty() } ?: "未检测到 Shizuku 运行信息",
+                error = !shizukuState.available || !shizukuState.authorized,
+            )
+
+            errorText?.let { text ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                ) {
+                    Text(
+                        text = text,
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            if (shizukuState.available && !shizukuState.authorized) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            try {
+                                shizukuState = ShizukuPrivilegeController.requestAuthorization()
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                ) {
+                    Text(text = "授权 Shizuku")
+                }
+            }
+            if (serverInfo == null) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy && shizukuState.authorized,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            errorText = null
+                            try {
+                                ShizukuPrivilegeController.start(context)
+                            } catch (e: Throwable) {
+                                errorText = e.message ?: e.javaClass.name
+                            } finally {
+                                busy = false
+                                shizukuState = ShizukuPrivilegeController.state()
+                            }
+                        }
+                    },
+                ) {
+                    Text(text = if (busy) "启动中..." else "启动特权服务")
+                }
+            } else {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    onClick = {
+                        ShizukuPrivilegeController.stop()
+                    },
+                ) {
+                    Text(text = "停止特权服务")
+                }
+            }
+            TextButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = throttle {
+                    shizukuState = ShizukuPrivilegeController.state()
+                },
+            ) {
+                Text(text = "刷新状态")
+            }
+            Spacer(modifier = Modifier.height(EmptyHeight))
+        }
+    }
+}
+
+@Composable
+private fun StatusCard(
+    title: String,
+    desc: String?,
+    error: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (error) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+            }
+            if (!desc.isNullOrEmpty()) {
+                Text(
+                    text = desc,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun PrivilegeServiceInfoDialog(onDismissRequest: () -> Unit) {
-    val linkStyles = TextLinkStyles(
-        style = SpanStyle(
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline,
-        ),
-    )
     AppAlertDialog(
         onDismissRequest = onDismissRequest,
         title = {
             Text(text = "特权服务")
         },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = "此页面用于启动和管理特权服务。连接后，可为 GKD 提供自动化、必要权限授予等需要系统级能力的功能；断开后，依赖特权服务的功能将不可用。",
-                )
-                Text(
-                    text = buildAnnotatedString {
-                        append("特权服务基于开源项目 ")
-                        withLink(
-                            LinkAnnotation.Url(
-                                url = "https://github.com/priv-kit/priv-kit",
-                                styles = linkStyles,
-                            ),
-                        ) {
-                            append("priv-kit")
-                        }
-                        append(" (自有特权运行时) 实现不依赖外部授权器提权")
-                    },
-                )
-            }
+            Text(
+                text = "此页面用于启动和管理 Shizuku 特权服务。连接后可为 GKD 提供写入安全设置授权、应用列表权限等系统级能力；断开后依赖特权服务的功能将不可用。\n\n使用前请确保 Shizuku 正在运行并已授权本应用。",
+            )
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
@@ -122,24 +269,4 @@ private fun PrivilegeServiceInfoDialog(onDismissRequest: () -> Unit) {
             }
         },
     )
-}
-
-private class GkdPrivilegeUiViewModel(
-    application: Application,
-    private val backAction: () -> Unit,
-) : PrivilegeUiViewModel(
-    application,
-    gkdPrivilegeUiConfig,
-) {
-    val showInfoDialogFlow: StateFlow<Boolean>
-        field = MutableStateFlow(false)
-
-    fun setInfoDialogVisible(visible: Boolean) {
-        showInfoDialogFlow.value = visible
-    }
-
-    override fun onBackClick(): Boolean {
-        backAction()
-        return true
-    }
 }

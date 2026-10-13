@@ -30,7 +30,6 @@ fun AppOverlayHost() {
         mainVm.subsLinkDialog.Render()
         mainVm.ruleGroupState.Render()
         mainVm.textDialog.Render()
-        mainVm.shareLog.Render()
     }
 }
 

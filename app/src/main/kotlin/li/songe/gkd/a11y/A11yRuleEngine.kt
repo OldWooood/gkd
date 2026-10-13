@@ -3,7 +3,6 @@ package li.songe.gkd.a11y
 import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.Display
-import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.Dispatchers
@@ -469,12 +468,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
 
         fun onScreenForcedActive() {
             instance?.onScreenForcedActive()
-        }
-
-        fun performActionBack(): Boolean {
-            val r1 = privilegeContextFlow.value?.keyevent(KeyEvent.KEYCODE_BACK)
-            if (r1 == true) return true
-            return A11yService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true
         }
     }
 }

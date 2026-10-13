@@ -1,13 +1,6 @@
-import com.android.build.api.artifact.SingleArtifact
-import com.android.build.api.variant.ApplicationAndroidComponentsExtension
-import com.android.build.api.variant.ApplicationVariant
 import com.android.build.api.variant.impl.VariantOutputImpl
-import li.songe.gradle.BuildAssetAdapter
-import li.songe.gradle.BuildAssetVariant
-import li.songe.gradle.GenerateSourcePathsTask
 import li.songe.gradle.GitInfo
 import li.songe.gradle.buildProperty
-import li.songe.gradle.configureBuildAssets
 import li.songe.gradle.gitInfo
 import li.songe.gradle.readDebugSuffixResources
 import kotlin.reflect.full.declaredMemberProperties
@@ -44,7 +37,6 @@ plugins {
     alias(libs.plugins.kotlinx.atomicfu)
     alias(libs.plugins.google.ksp)
     alias(libs.plugins.remap)
-    alias(libs.plugins.loc)
 }
 
 android {
@@ -88,18 +80,6 @@ android {
         signingConfigs.getByName("debug")
     }
 
-    val playStoreFile = buildProperty("PLAY_STORE_FILE").orNull
-    val playSigningConfig = if (playStoreFile != null) {
-        signingConfigs.create("play") {
-            storeFile = file(playStoreFile)
-            storePassword = buildProperty("PLAY_STORE_PASSWORD").orNull
-            keyAlias = buildProperty("PLAY_KEY_ALIAS").orNull
-            keyPassword = buildProperty("PLAY_KEY_PASSWORD").orNull
-        }
-    } else {
-        gkdSigningConfig
-    }
-
     buildTypes {
         all {
             vcsInfo.include = false
@@ -130,10 +110,6 @@ android {
             signingConfig = gkdSigningConfig
             resValue("bool", "is_accessibility_tool", "true")
         }
-        create("play") {
-            signingConfig = playSigningConfig
-            resValue("bool", "is_accessibility_tool", "false")
-        }
         all {
             dimension = flavorDimensions.first()
             manifestPlaceholders["channel"] = name
@@ -152,48 +128,6 @@ android {
         "DebugProbesKt.bin",
     )
 }
-
-val androidBuildAssetAdapter =
-    BuildAssetAdapter<ApplicationAndroidComponentsExtension, ApplicationVariant>(
-        onVariants = { components, buildType, action ->
-            val selector = if (buildType == null) {
-                components.selector().all()
-            } else {
-                components.selector().withBuildType(buildType)
-            }
-            components.onVariants(selector, action)
-        },
-        addGeneratedSourceDirectory = { variant, task ->
-            variant.sources.assets?.addGeneratedSourceDirectory(
-                task,
-                GenerateSourcePathsTask::outputDirectory,
-            )
-        },
-        describe = { variant ->
-            val flavorName = variant.productFlavors
-                .single { it.first == "channel" }
-                .second
-            val mainOutput = variant.outputs.single()
-            BuildAssetVariant(
-                name = variant.name,
-                flavor = flavorName,
-                buildType = requireNotNull(variant.buildType),
-                mappingFile = variant.artifacts.get(
-                    SingleArtifact.OBFUSCATION_MAPPING_FILE,
-                ),
-                versionCode = mainOutput.versionCode,
-                versionName = mainOutput.versionName,
-            )
-        },
-        computeTaskName = { variant, action, subject ->
-            variant.computeTaskName(action, subject)
-        },
-    )
-
-configureBuildAssets(
-    androidComponents = androidComponents,
-    adapter = androidBuildAssetAdapter,
-)
 
 if (buildProperty("GKD_RENAME_APK_FLAG").isPresent) {
     androidComponents.onVariants { variant ->
@@ -216,22 +150,18 @@ composeCompiler {
     )
 }
 
-loc {
-    template = "{packageName}.{methodName}({fileName}:{lineNumber})"
-}
-
 dependencies {
     implementation(libs.kotlin.stdlib)
 
     implementation(project(":selector"))
 
-    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.service)
 
     implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.animation)
     implementation(libs.compose.animation.graphics)
@@ -257,7 +187,7 @@ dependencies {
     compileOnly(project(":hidden-api"))
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)
-    implementation(libs.priv.kit.ui)
+    implementation(libs.priv.kit.core)
     implementation(libs.lsposed.hiddenapibypass)
 
     implementation(libs.androidx.room.runtime)
@@ -280,21 +210,7 @@ dependencies {
     // https://github.com/Kotlin/kotlinx-atomicfu/issues/145
     implementation(libs.kotlinx.atomicfu)
 
-    implementation(libs.reorderable)
-
-    implementation(libs.androidx.splashscreen)
-
-    implementation(libs.coil.compose)
-    implementation(libs.coil.network)
-    implementation(libs.coil.gif)
-    implementation(libs.telephoto.zoomable)
-
     implementation(libs.exp4j)
 
-    implementation(libs.toaster)
-    implementation(libs.permissions)
-    implementation(libs.device)
-
     implementation(libs.json5)
-    compileOnly(libs.loc.annotation)
 }

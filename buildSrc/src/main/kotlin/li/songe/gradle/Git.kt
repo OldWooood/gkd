@@ -59,20 +59,6 @@ abstract class GitInfoValueSource : ValueSource<GitInfo, GitInfoValueSource.Para
     }
 }
 
-abstract class GitOutputValueSource : ValueSource<String, GitOutputValueSource.Parameters> {
-    interface Parameters : ValueSourceParameters {
-        val repositoryDirectory: DirectoryProperty
-        val arguments: ListProperty<String>
-    }
-
-    override fun obtain(): String {
-        return runGitCommandBytes(
-            parameters.repositoryDirectory.get().asFile.absolutePath,
-            parameters.arguments.get(),
-        ).toString(Charsets.UTF_8)
-    }
-}
-
 abstract class GitInfoService : BuildService<GitInfoService.Parameters> {
     interface Parameters : BuildServiceParameters {
         val gitInfo: Property<GitInfo>

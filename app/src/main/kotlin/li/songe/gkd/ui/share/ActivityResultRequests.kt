@@ -1,10 +1,7 @@
 package li.songe.gkd.ui.share
 
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.ComponentActivity
-import androidx.activity.result.ActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -23,43 +20,22 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class ActivityResultRequests {
-    private val activityRequest = SuspendedActivityResultRequest<Intent, ActivityResult>()
     private val documentRequest = SuspendedActivityResultRequest<Array<String>, Uri?>()
-    private val imageRequest = SuspendedActivityResultRequest<PickVisualMediaRequest, Uri?>()
-    private val imageRequestInput =
-        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-
-    suspend fun startActivity(intent: Intent): ActivityResult =
-        activityRequest.launchForResult(intent)
 
     suspend fun openDocument(vararg mimeTypes: String): Uri? =
         documentRequest.launchForResult(arrayOf(*mimeTypes))
 
-    suspend fun pickImage(): Uri? = imageRequest.launchForResult(imageRequestInput)
-
     private fun cancelPendingRequests() {
-        activityRequest.dispose()
         documentRequest.dispose()
-        imageRequest.dispose()
     }
 
     class Host(
         private val activity: ComponentActivity,
     ) : DefaultLifecycleObserver {
-        private val activityLauncher = registerLauncher(
-            ActivityResultContracts.StartActivityForResult(),
-        ) { requests, result ->
-            requests.activityRequest.resume(result)
-        }
         private val documentLauncher = registerLauncher(
             ActivityResultContracts.OpenDocument(),
         ) { requests, result ->
             requests.documentRequest.resume(result)
-        }
-        private val imageLauncher = registerLauncher(
-            ActivityResultContracts.PickVisualMedia(),
-        ) { requests, result ->
-            requests.imageRequest.resume(result)
         }
 
         private var requests: ActivityResultRequests? = null
@@ -74,14 +50,8 @@ class ActivityResultRequests {
             bindingJobs.forEach { it.cancel() }
             bindingJobs.clear()
             this.requests = requests
-            bindingJobs += bindRequest(requests.activityRequest) { input ->
-                activityLauncher.launch(input)
-            }
             bindingJobs += bindRequest(requests.documentRequest) { input ->
                 documentLauncher.launch(input)
-            }
-            bindingJobs += bindRequest(requests.imageRequest) { input ->
-                imageLauncher.launch(input)
             }
         }
 

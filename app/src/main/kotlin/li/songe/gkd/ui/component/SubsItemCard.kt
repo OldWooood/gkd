@@ -2,8 +2,6 @@ package li.songe.gkd.ui.component
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,7 +38,6 @@ import li.songe.gkd.util.throttle
 @Composable
 fun SubsItemCard(
     modifier: Modifier = Modifier,
-    interactionSource: MutableInteractionSource,
     subsItem: SubsItem,
     subscription: RawSubscription?,
     index: Int,
@@ -53,14 +50,10 @@ fun SubsItemCard(
     onCheckedChange: ((Boolean) -> Unit),
     onSelectedChange: (() -> Unit)? = null,
 ) {
-    val dragged by interactionSource.collectIsDraggedAsState()
-    val onClick = {
-        if (!dragged) {
-            if (isSelectedMode) {
-                onSelectedChange?.invoke()
-            } else if (!refreshing) {
-                onOpen()
-            }
+    val onClick: () -> Unit = {
+        when {
+            isSelectedMode -> onSelectedChange?.invoke()
+            !refreshing -> onOpen()
         }
     }
     val containerColor = animateColorAsState(
@@ -85,7 +78,6 @@ fun SubsItemCard(
                 this.onLongClick(label = "进入多选模式", action = null)
             },
         shape = MaterialTheme.shapes.small,
-        interactionSource = interactionSource,
         colors = CardDefaults.cardColors(
             containerColor = containerColor.value
         ),

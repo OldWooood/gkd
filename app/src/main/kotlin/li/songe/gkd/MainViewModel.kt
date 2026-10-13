@@ -9,21 +9,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import li.songe.gkd.a11y.useA11yServiceEnabledFlow
 import li.songe.gkd.a11y.useEnabledA11yServicesFlow
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.db.DbSet
-import li.songe.gkd.entry.EntryActivity
-import li.songe.gkd.entry.OpenFileActivity
-import li.songe.gkd.permission.PermissionRequests
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.store.createTextFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.component.DialogRequests
 import li.songe.gkd.ui.component.RuleGroupState
-import li.songe.gkd.ui.component.ShareLogState
 import li.songe.gkd.ui.component.ShowGroupState
 import li.songe.gkd.ui.component.SubsLinkDialogState
 import li.songe.gkd.ui.component.SubsSheetState
@@ -33,7 +28,6 @@ import li.songe.gkd.ui.home.HomeRoute
 import li.songe.gkd.ui.share.BaseViewModel
 import li.songe.gkd.ui.share.Loadable
 import li.songe.gkd.ui.share.ActivityResultRequests
-import li.songe.gkd.util.BackupUtils
 import li.songe.gkd.util.DefaultSimpleLifeImpl
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.OnSimpleLife
@@ -47,7 +41,6 @@ import li.songe.gkd.util.openUri
 import li.songe.gkd.util.openWeChatScaner
 import li.songe.gkd.util.runMainPost
 import li.songe.gkd.util.toast
-import li.songe.loc.Loc
 
 data class PageScrollResetRequest(
     val id: Long,
@@ -80,16 +73,13 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     override val scope get() = super.scope
 
     val activityResults = ActivityResultRequests()
-    val permissionRequests = PermissionRequests {
-        navigatePage(PrivilegeServiceRoute)
-    }
 
     val backStack: NavBackStack<NavKey> = NavBackStack(HomeRoute)
     val topRoute get() = backStack.last()
 
     private val backThrottleTimer = ThrottleTimer()
 
-    fun popPage(@Loc loc: String = "") = runMainPost {
+    fun popPage(loc: String = "") = runMainPost {
         if (backThrottleTimer.expired() && backStack.size > 1) {
             val old = backStack.last()
             backStack.removeAt(backStack.lastIndex)
@@ -100,7 +90,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     fun navigatePage(
         navKey: NavKey,
         replaced: Boolean = false,
-        @Loc loc: String = "",
+        loc: String = "",
     ) = runMainPost {
         if (navKey != backStack.last()) {
             val old = backStack.last()
@@ -119,12 +109,12 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
     val updateStatus = if (META.updateEnabled) UpdateStatus(scope) else null
 
-    val shareLog = ShareLogState(scope = scope)
-
     val subsLinkDialog = SubsLinkDialogState(
         onOpenHelp = { openWebPage(ShortUrlSet.URL5) },
         requestLocalNetworkPermission = {
-            permissionRequests.ensurePermissions(PermissionStates.localNetwork)
+            PermissionStates.localNetwork.updateAndGet().also { granted ->
+                if (!granted) toast("未授予本地网络权限, 请先连接特权服务")
+            }
         },
     )
 
@@ -216,11 +206,8 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     fun handleIntent(intent: Intent) = scope.launchTry {
         LogUtils.d(intent)
         val uri = intent.data?.normalizeScheme()
-        val source = intent.getStringExtra(EntryActivity.activityNavSourceName)
         if (uri?.scheme == "gkd") {
             handleGkdUri(uri)
-        } else if (source == OpenFileActivity::class.java.name && uri != null) {
-            withContext(Dispatchers.IO) { BackupUtils.importBackUpData(uri) }
         }
     }
 
