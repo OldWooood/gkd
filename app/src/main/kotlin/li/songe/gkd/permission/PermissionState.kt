@@ -3,6 +3,7 @@ package li.songe.gkd.permission
 import android.Manifest
 import android.app.AppOpsManager
 import android.app.AppOpsManagerHidden
+import android.content.pm.PermissionInfo
 import android.provider.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,6 +44,17 @@ private fun checkAllowedOp(op: String): Boolean = app.appOpsManager.checkOpNoThr
     app.packageName
 ).let {
     it != AppOpsManager.MODE_IGNORED && it != AppOpsManager.MODE_ERRORED
+}
+
+private const val installedAppsPermissionName = "com.android.permission.GET_INSTALLED_APPS"
+
+// 仅部分机型(OEM)把「读取应用列表」做成运行时权限；不是运行时权限时视为已授权
+private val installedAppsRuntimePermission: Boolean by lazy {
+    runCatching {
+        val info = app.packageManager.getPermissionInfo(installedAppsPermissionName, 0)
+        (info.protection and PermissionInfo.PROTECTION_MASK_BASE) ==
+            PermissionInfo.PROTECTION_DANGEROUS
+    }.getOrDefault(false)
 }
 
 
@@ -103,7 +115,9 @@ object PermissionStates {
         PermissionState(
             name = "读取应用列表权限",
             check = {
-                app.checkGrantedPermission("com.android.permission.GET_INSTALLED_APPS")
+                // 该权限仅在部分机型上是运行时权限；不是运行时权限时视为已授权
+                !installedAppsRuntimePermission ||
+                    app.checkGrantedPermission(installedAppsPermissionName)
             },
             onChanged = {
                 if (!updateAppMutex.mutex.isLocked) {

@@ -9,6 +9,7 @@ import li.songe.gkd.META
 import li.songe.gkd.app
 import li.songe.gkd.permission.PermissionStates
 import li.songe.gkd.util.AndroidTarget
+import li.songe.gkd.util.LogUtils
 import priv.kit.core.Privilege
 import priv.kit.core.PrivilegeServerInfo
 import priv.kit.core.PrivilegeUserServiceConnection
@@ -81,10 +82,15 @@ class PrivilegeContext private constructor(
 
     private fun grantSelfPermission(name: String) {
         if (app.checkGrantedPermission(name)) return
-        Privilege.grantRuntimePermission(
-            packageName = META.appId,
-            permissionName = name,
-        )
+        try {
+            Privilege.grantRuntimePermission(
+                packageName = META.appId,
+                permissionName = name,
+            )
+        } catch (e: Throwable) {
+            // 单个权限授予失败不应导致特权上下文创建失败
+            LogUtils.d("grantSelfPermission failed", name, e)
+        }
     }
 
     private fun allowAllSelfPermission() {
