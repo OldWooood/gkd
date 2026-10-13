@@ -1,5 +1,11 @@
 # 更新内容
 
+- 特权服务收敛为 Shizuku 单通道：自绘特权页，移除 priv-ui 依赖与 Root/ADB/手动 shell 启动入口
+- 移除常驻通知服务、通知权限及相关设置项
+- 移除导出日志与构建资产链、规则示例图预览（coil/telephoto）、本地规则编辑、白名单编辑页、备份恢复、外观设置等非开屏功能
+- 移除多用户/分身支持链与对应 hidden-api stub，移除 XXPermissions/Toaster/DeviceCompat/splashscreen 等第三方组件
+- 只保留点击类动作（clickNode/clickCenter/click），移除返回/滑动/长按动作链与 swipeArg 解析
+- 清理废弃组件、图标与资源，移除 loc 插件与私有资产上传任务，selector 模块移除 JS 目标
 - 精简已删功能的残留代码（HTTP 调试服务、快照上传、缓慢查询、类别管理等，约 1000 行）
 - 移除无用的 ktor-server 依赖，组件名获取改用无反射实现，减小安装包体积
 - 移除首页「工作模式」残留入口行
