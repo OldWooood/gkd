@@ -32,6 +32,13 @@ fun toast(
     delayMillis: Long = 0L,
     loc: String = "",
 ) {
+    if (!isMainThread) {
+        // 系统 Toast 必须在有 Looper 的线程(主线程)调用
+        runMainPost {
+            toast(text = text, forced = forced, delayMillis = delayMillis, loc = loc)
+        }
+        return
+    }
     if (delayMillis > 0) {
         runMainPost(delayMillis) {
             toast(text = text, forced = forced, loc = loc)
