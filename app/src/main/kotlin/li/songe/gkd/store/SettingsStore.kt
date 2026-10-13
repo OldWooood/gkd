@@ -17,13 +17,10 @@ data class SettingsStore(
     val toastWhenClick: Boolean = true,
     val actionToast: String = META.appName,
     val updateChannel: Int = if (META.isBeta) UpdateChannelOption.Beta.value else UpdateChannelOption.Stable.value,
-    val appSort: Int = AppSortOption.ByUsedTime.value,
-    val showBlockApp: Boolean = true,
     val appRuleSort: Int = RuleSortOption.ByDefault.value,
     val subsAppSort: Int = AppSortOption.ByUsedTime.value,
     val subsAppGroupType: Int = AppGroupOption.UserGroup.value or AppGroupOption.SystemGroup.value,
     val subsAppShowBlock: Boolean = false,
     val subsPowerWarn: Boolean = true,
-    val appGroupType: Int = (1 shl AppGroupOption.normalObjects.size) - 1,
     val showDisabledRule: Boolean = true,
 )

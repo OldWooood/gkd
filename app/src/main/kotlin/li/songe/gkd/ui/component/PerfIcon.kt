@@ -9,7 +9,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
@@ -163,7 +162,6 @@ object PerfIcon {
     val Settings get() = Icons.Outlined.Settings
     val Home get() = Icons.Outlined.Home
     val FormatListBulleted get() = Icons.AutoMirrored.Filled.FormatListBulleted
-    val Apps get() = Icons.Default.Apps
     val Info get() = Icons.Outlined.Info
     val ToggleOff get() = Icons.Outlined.ToggleOff
     val ToggleOn get() = Icons.Outlined.ToggleOn

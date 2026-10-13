@@ -167,9 +167,6 @@ fun ActionLogPage(route: ActionLogRoute) {
                         },
                         subsId = subsId,
                         appId = appId,
-                        onOpenApp = {
-                            mainVm.navigatePage(AppConfigRoute(it))
-                        },
                     )
                 }
             }
@@ -225,7 +222,6 @@ private fun ActionLogCard(
     item: ActionLogListItem,
     lastItem: ActionLogListItem?,
     onClick: () -> Unit,
-    onOpenApp: (String) -> Unit,
     subsId: Long?,
     appId: String?,
 ) {
@@ -249,7 +245,6 @@ private fun ActionLogCard(
                 modifier = Modifier
                     .padding(start = itemHorizontalPadding / 4)
                     .clip(MaterialTheme.shapes.extraSmall)
-                    .clickable(onClick = throttle { onOpenApp(actionLog.appId) })
                     .fillMaxWidth()
                     .padding(start = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),

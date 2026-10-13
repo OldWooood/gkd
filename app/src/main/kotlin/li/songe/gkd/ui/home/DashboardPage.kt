@@ -43,7 +43,6 @@ import li.songe.gkd.priv.privilegeServiceStatusFlow
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.service.switchAutomatorService
 import li.songe.gkd.ui.ActionLogRoute
-import li.songe.gkd.ui.AppConfigRoute
 import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.component.GroupNameText
 import li.songe.gkd.ui.component.PerfIcon
@@ -170,7 +169,7 @@ fun useDashboardPage(): ScaffoldExt {
                 onOpenActionLog = { mainVm.navigatePage(ActionLogRoute()) },
                 onOpenLatestRecord = {
                     latestRecord?.let {
-                        mainVm.navigatePage(AppConfigRoute(appId = it.appId, focusLog = it))
+                        mainVm.navigatePage(ActionLogRoute(appId = it.appId))
                     }
                 },
             )

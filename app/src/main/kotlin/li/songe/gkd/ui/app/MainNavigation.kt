@@ -12,8 +12,6 @@ import li.songe.gkd.ui.AboutPage
 import li.songe.gkd.ui.AboutRoute
 import li.songe.gkd.ui.ActionLogPage
 import li.songe.gkd.ui.ActionLogRoute
-import li.songe.gkd.ui.AppConfigPage
-import li.songe.gkd.ui.AppConfigRoute
 import li.songe.gkd.ui.PrivilegeServicePage
 import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.SubsAppGroupListPage
@@ -31,7 +29,6 @@ private val mainRouteEntryProvider = entryProvider {
     entry<SubsAppListRoute> { SubsAppListPage(it) }
     entry<ActionLogRoute> { ActionLogPage(it) }
     entry<SubsAppGroupListRoute> { SubsAppGroupListPage(it) }
-    entry<AppConfigRoute> { AppConfigPage(it) }
 }
 
 @Composable

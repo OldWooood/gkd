@@ -34,12 +34,6 @@ sealed class BottomNavItem(
         icon = PerfIcon.FormatListBulleted,
     )
 
-    object AppList : BottomNavItem(
-        key = 2,
-        label = "应用",
-        icon = PerfIcon.Apps,
-    )
-
     object Settings : BottomNavItem(
         key = 3,
         label = "设置",
@@ -47,7 +41,7 @@ sealed class BottomNavItem(
     )
 
     companion object {
-        val allSubObjects by lazy { arrayOf(Dashboard, SubsManage, AppList, Settings) }
+        val allSubObjects by lazy { arrayOf(Dashboard, SubsManage, Settings) }
     }
 }
 
@@ -83,7 +77,6 @@ fun HomePage() {
         val page = when (selectedTab) {
             BottomNavItem.Dashboard -> useDashboardPage()
             BottomNavItem.SubsManage -> useSubsManagePage()
-            BottomNavItem.AppList -> useAppListPage()
             BottomNavItem.Settings -> useSettingsPage()
         }
         Scaffold(

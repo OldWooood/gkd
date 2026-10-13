@@ -141,8 +141,6 @@ private fun updatePartAppInfo(
     )
 }
 
-val appListAuthAbnormalFlow = MutableStateFlow(false)
-
 fun updateAllAppInfo(): Unit = updateAppMutex.launchTry(appScope, Dispatchers.IO) {
     val newAppMap = HashMap<String, AppInfo>()
     val newIconMap = HashMap<String, Drawable>()
@@ -157,7 +155,6 @@ fun updateAllAppInfo(): Unit = updateAppMutex.launchTry(appScope, Dispatchers.IO
     }
     val mayAuthDenied = newAppMap.count { !it.value.isSystem } <= 4
     PermissionStates.queryPackages.updateAndGet()
-    appListAuthAbnormalFlow.value = PermissionStates.queryPackages.value && mayAuthDenied
     if (!PermissionStates.queryPackages.value || mayAuthDenied) {
         LogUtils.d(
             "updateAllAppInfo",

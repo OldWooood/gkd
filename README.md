@@ -32,7 +32,7 @@
 - **应用内更新指向本仓库**：通过 `releases/latest/download/update.json` 检查更新，与官方源完全隔离
 - **本地签名配置**：支持仓库根目录未跟踪的 `key.properties`（兼容 `storeFile/storePassword/keyAlias/keyPassword` 键名）
 - **已移除**：快照、界面/事件/崩溃日志、HTTP 调试服务、高级设置页、GitHub Actions；对应 4 张数据库表通过迁移删除
-- **本轮继续精简**：移除常驻通知服务、导出日志与构建资产链、规则示例图预览（coil/telephoto）、本地规则编辑、白名单编辑页、备份恢复、外观设置、多用户/分身支持、XXPermissions/Toaster/DeviceCompat/splashscreen 等第三方组件；selector 移除 JS 目标，hidden-api 清理废弃 stub
+- **本轮继续精简**：移除底部「应用」页与应用规则汇总页、常驻通知服务、导出日志与构建资产链、规则示例图预览（coil/telephoto）、本地规则编辑、白名单编辑页、备份恢复、外观设置、多用户/分身支持、XXPermissions/Toaster/DeviceCompat/splashscreen 等第三方组件；selector 移除 JS 目标，hidden-api 清理废弃 stub
 
 ## 安装
 
