@@ -9,6 +9,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,22 +35,50 @@ private val queryDispatcher = Executors.newSingleThreadExecutor().asCoroutineDis
 private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
 private const val FAST_EVENT_DELIVERY_TIMEOUT = 0L
-private const val IDLE_EVENT_DELIVERY_TIMEOUT = 500L
-private const val PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT = 1000L
-private const val SPLASH_ACTIVE_WINDOW = 5_000L
+private const val PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT = 0L
+private const val FALLBACK_IDLE_EVENT_DELIVERY_TIMEOUT = 500L
+private const val SPLASH_ACTIVE_WINDOW = 8_000L
+private const val POST_TRIGGER_WINDOW = 3_000L
 
-private val idleEventDeliveryTimeout: Long
-    get() = if (privilegeContextFlow.value != null) {
-        PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT
-    } else {
-        IDLE_EVENT_DELIVERY_TIMEOUT
-    }
+private data class DeliveryProfile(
+    val eventTypes: Int,
+    val notificationTimeout: Long,
+    val cacheEnabled: Boolean,
+)
+
+// FAST: 开屏窗口内全量投递, 打开节点缓存以启用预取
+private val fastDeliveryProfile = DeliveryProfile(
+    eventTypes = STATE_CHANGED or CONTENT_CHANGED,
+    notificationTimeout = FAST_EVENT_DELIVERY_TIMEOUT,
+    cacheEnabled = true,
+)
+
+// 特权空闲: 只留 state 事件, 关闭节点缓存以掐断 cache-critical 强制投递
+private val privilegedIdleDeliveryProfile = DeliveryProfile(
+    eventTypes = STATE_CHANGED,
+    notificationTimeout = PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT,
+    cacheEnabled = false,
+)
+
+// 非特权空闲: 与历史行为一致, 开窗依赖事件投递
+private val fallbackIdleDeliveryProfile = DeliveryProfile(
+    eventTypes = STATE_CHANGED or CONTENT_CHANGED,
+    notificationTimeout = FALLBACK_IDLE_EVENT_DELIVERY_TIMEOUT,
+    cacheEnabled = true,
+)
 
 class A11yRuleEngine(val service: A11yCommonImpl) {
     private val a11yContext = A11yContext(this)
 
     fun onA11yConnected() {
-        refreshEventDeliveryTimeout()
+        refreshDeliveryProfile()
+        // 特权连接/断开, 匹配开关变化时立即重算档位
+        scope.launch(actionDispatcher) {
+            privilegeContextFlow.collect { refreshDeliveryProfile() }
+        }
+        scope.launch(actionDispatcher) {
+            storeFlow.map { it.enableMatch }.distinctUntilChanged().collect { refreshDeliveryProfile() }
+        }
         startQueryJob(byForced = true)
     }
 
@@ -62,13 +92,13 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 scene = ActivityScene.ScreenOn
             )
         }
-        refreshEventDeliveryTimeout()
+        refreshDeliveryProfile()
         startQueryJob()
     }
 
     fun onTopActivityChanged(idChanged: Boolean) {
         scope.launch(actionDispatcher) {
-            refreshEventDeliveryTimeout()
+            refreshDeliveryProfile()
             if (idChanged) {
                 prewarmActiveWindow()
             }
@@ -184,6 +214,10 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         if (evAppId != rightAppId || activityRule.skipConsumeEvent || !storeFlow.value.enableMatch) {
             return
         }
+        // 特权空闲期不做匹配: 事件不进入查询队列, 避免堆积
+        if (!gateOpen(System.currentTimeMillis())) {
+            return
+        }
         synchronized(queryEvents) { queryEvents.addAll(consumedEvents) }
         a11yContext.interruptKey++
         startQueryJob(byEvent = latestEvent)
@@ -193,12 +227,21 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     private var lastAppId: String? = null
     private suspend fun getTimeoutAppId(): String? {
         if (lastAppId != null && System.currentTimeMillis() - lastGetAppIdTime <= 100) return lastAppId
+        val privileged = privilegeContextFlow.value != null
+        // 特权空闲期禁止无障碍回落: 读取 root 会打开服务端缓存标志,
+        // 使 cache-critical 事件恢复投递, 破坏空闲零投递
+        val allowA11yFallback = !privileged ||
+            computeDeliveryProfile(System.currentTimeMillis()) == fastDeliveryProfile
         // 特权通道读取栈顶组件远快于无障碍 root 节点获取,
         // 优先使用可避免 safeActiveWindow 耗时导致事件堆积堵塞
         // https://github.com/gkd-kit/gkd/issues/622
         lastAppId = privilegeContextFlow.value?.run { topCpn()?.packageName }
-            ?: withTimeoutOrNull(100.milliseconds) {
-                runInterruptible(Dispatchers.IO) { safeActiveWindowAppId }
+            ?: if (allowA11yFallback) {
+                withTimeoutOrNull(100.milliseconds) {
+                    runInterruptible(Dispatchers.IO) { safeActiveWindowAppId }
+                }
+            } else {
+                null
             }
         lastGetAppIdTime = System.currentTimeMillis()
         return lastAppId
@@ -220,6 +263,9 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         byDelayRule: ResolvedRule? = null,
     ) {
         if (!storeFlow.value.enableMatch) return
+        // 特权空闲期禁止匹配查询: 查询会打开服务端缓存标志, 令 cache-critical 事件恢复投递
+        // 这里不能触发 checkFutureStartJob, 否则会形成 300ms 空转自旋
+        if (!gateOpen(System.currentTimeMillis())) return
         if (activityRuleFlow.value.currentRules.isEmpty()) return
         if (querying) return
         // 无障碍从零启动时获取 safeActiveWindow 非常耗时
@@ -236,6 +282,9 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 }
                 queryAction(byEvent, byForced, byDelayRule)
             } finally {
+                // 查询会把服务端缓存标志重新置位, 标记后在回到空闲档时强制重关
+                cacheDirty = true
+                applyDeliveryProfile()
                 checkFutureStartJob()
                 if (META.debuggable) {
                     val et = System.currentTimeMillis() - st
@@ -270,43 +319,86 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         }
     }
 
-    private var latestEventDeliveryTimeout = -1L
-    private var eventDeliveryRestoreJob: Job? = null
+    private val deliveryProfileLock = Any()
+    private var appliedEventTypes: Int? = null
+    private var appliedEventTimeout: Long? = null
+    private var appliedCacheEnabled: Boolean? = true
+    private var deliveryRestoreJob: Job? = null
 
-    private fun refreshEventDeliveryTimeout() {
-        val timeoutMillis = computeEventDeliveryTimeout()
-        applyEventDeliveryTimeout(timeoutMillis)
-        eventDeliveryRestoreJob?.cancel()
-        if (timeoutMillis == FAST_EVENT_DELIVERY_TIMEOUT) {
-            // delay 锚定 appChangeTime, 避免窗口内重复 refresh 导致降档时刻不断后移
-            val remain = appChangeTime + SPLASH_ACTIVE_WINDOW - System.currentTimeMillis()
-            eventDeliveryRestoreJob = scope.launch(actionDispatcher) {
-                delay(remain + 500L)
-                applyEventDeliveryTimeout(computeEventDeliveryTimeout())
+    @Volatile
+    private var cacheDirty = false
+
+    // 窗口或触发后尾巴是否有效(窗口起点为 appChangeTime: 最近一次 app 切换或亮屏)
+    private fun windowOrTailActive(t: Long): Boolean {
+        return t - appChangeTime < SPLASH_ACTIVE_WINDOW || t - lastTriggerTime < POST_TRIGGER_WINDOW
+    }
+
+    // 门控: 非特权路径保持现状, 特权路径仅窗口/尾巴内允许匹配查询
+    private fun gateOpen(t: Long): Boolean {
+        return privilegeContextFlow.value == null || windowOrTailActive(t)
+    }
+
+    private fun idleDeliveryProfile(): DeliveryProfile {
+        return if (privilegeContextFlow.value != null) {
+            privilegedIdleDeliveryProfile
+        } else {
+            fallbackIdleDeliveryProfile
+        }
+    }
+
+    private fun computeDeliveryProfile(t: Long): DeliveryProfile {
+        if (!storeFlow.value.enableMatch) return idleDeliveryProfile()
+        val activityRule = activityRuleFlow.value
+        if (activityRule.currentRules.isEmpty() || activityRule.skipMatch) return idleDeliveryProfile()
+        return if (windowOrTailActive(t)) fastDeliveryProfile else idleDeliveryProfile()
+    }
+
+    private fun applyDeliveryProfile() {
+        val profile = computeDeliveryProfile(System.currentTimeMillis())
+        synchronized(deliveryProfileLock) {
+            val accessibilityService = service as? AccessibilityService ?: return
+            try {
+                if (profile.eventTypes != appliedEventTypes || profile.notificationTimeout != appliedEventTimeout) {
+                    val info = accessibilityService.serviceInfo ?: return
+                    info.eventTypes = profile.eventTypes
+                    info.notificationTimeout = profile.notificationTimeout
+                    accessibilityService.setServiceInfo(info)
+                    appliedEventTypes = profile.eventTypes
+                    appliedEventTimeout = profile.notificationTimeout
+                }
+                if (profile.cacheEnabled) {
+                    if (appliedCacheEnabled != true && accessibilityService.setCacheEnabled(true)) {
+                        appliedCacheEnabled = true
+                    }
+                } else if (cacheDirty || appliedCacheEnabled != false) {
+                    // 查询会偷偷打开服务端缓存标志, 强制重关路径必须绕过去重
+                    if (accessibilityService.setCacheEnabled(false)) {
+                        appliedCacheEnabled = false
+                        cacheDirty = false
+                    }
+                }
+            } catch (_: Throwable) {
+                // 连接异常时不记账, 下次重算时重试
             }
         }
     }
 
-    private fun computeEventDeliveryTimeout(): Long {
-        if (!storeFlow.value.enableMatch) return idleEventDeliveryTimeout
-        val activityRule = activityRuleFlow.value
-        if (activityRule.currentRules.isEmpty()) return idleEventDeliveryTimeout
-        if (activityRule.skipMatch) return idleEventDeliveryTimeout
-        // 仅关注冷启动/应用切换后的开屏窗口,
-        // 应用内界面切换不会更新 appChangeTime, 不再重新武装全速档
-        val active = System.currentTimeMillis() - appChangeTime < SPLASH_ACTIVE_WINDOW
-        return if (active) FAST_EVENT_DELIVERY_TIMEOUT else idleEventDeliveryTimeout
-    }
-
-    private fun applyEventDeliveryTimeout(timeoutMillis: Long) {
-        if (timeoutMillis == latestEventDeliveryTimeout) return
-        latestEventDeliveryTimeout = timeoutMillis
-        val accessibilityService = service as? AccessibilityService ?: return
-        try {
-            val info = accessibilityService.serviceInfo ?: return
-            info.notificationTimeout = timeoutMillis
-            accessibilityService.setServiceInfo(info)
-        } catch (_: Throwable) {
+    private fun refreshDeliveryProfile() {
+        applyDeliveryProfile()
+        deliveryRestoreJob?.cancel()
+        if (!windowOrTailActive(System.currentTimeMillis())) return
+        deliveryRestoreJob = scope.launch(actionDispatcher) {
+            while (true) {
+                val remain = maxOf(
+                    appChangeTime + SPLASH_ACTIVE_WINDOW,
+                    lastTriggerTime + POST_TRIGGER_WINDOW,
+                ) - System.currentTimeMillis()
+                if (remain > 0) {
+                    delay(remain.milliseconds)
+                }
+                applyDeliveryProfile()
+                if (!windowOrTailActive(System.currentTimeMillis())) break
+            }
         }
     }
 
@@ -331,6 +423,8 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         byForced: Boolean = false,
         delayRule: ResolvedRule? = null,
     ) {
+        // 保证第一个节点访问发生前, 档位(含节点缓存与预取)已经生效
+        applyDeliveryProfile()
         val tempStateEvent = latestStateEvent
         val newEvents = if (delayRule != null) {// 延迟规则不消耗事件
             null
@@ -438,6 +532,8 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             if (actionResult.result) {
                 val topActivity = topActivityFlow.value
                 rule.trigger()
+                // 触发后的 3 秒尾巴参与关窗时刻, 需要重排降档
+                refreshDeliveryProfile()
                 scope.launch(actionDispatcher) {
                     delay(300.milliseconds)
                     startQueryJob()
