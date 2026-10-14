@@ -368,7 +368,7 @@ private fun AddSubsItemCard(onClick: () -> Unit) {
         modifier = Modifier
             .padding(horizontal = itemHorizontalPadding)
             .semantics { this.onClick(label = "打开添加订阅弹窗", action = null) },
-        shape = MaterialTheme.shapes.small,
+        shape = MaterialTheme.shapes.large,
         colors = surfaceCardColors,
     ) {
         Row(

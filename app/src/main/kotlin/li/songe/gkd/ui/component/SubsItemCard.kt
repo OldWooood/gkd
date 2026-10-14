@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsItem
 import li.songe.gkd.ui.style.itemHorizontalPadding
+import li.songe.gkd.ui.style.itemVerticalPadding
 import li.songe.gkd.util.formatTimeAgo
 import li.songe.gkd.util.throttle
 
@@ -76,14 +77,14 @@ fun SubsItemCard(
                 this.onClick(label = "查看订阅详情", action = null)
                 this.onLongClick(label = "进入多选模式", action = null)
             },
-        shape = MaterialTheme.shapes.small,
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             containerColor = containerColor.value
         ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(itemVerticalPadding),
         ) {
             Column(
                 modifier = Modifier.weight(1f),
