@@ -35,14 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import li.songe.gkd.META
 import li.songe.gkd.ui.ActionLogRoute
 import li.songe.gkd.ui.SubsAppListRoute
 import li.songe.gkd.ui.SubsSheetVm
 import li.songe.gkd.ui.share.LocalMainViewModel
 import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.itemHorizontalPadding
-import li.songe.gkd.util.LOCAL_SUBS_ID
 import li.songe.gkd.util.SubscriptionResult
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.subsItemsFlow
@@ -175,28 +173,20 @@ class SubsSheetState {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                if (!subsItem.isLocal) {
-                                    Text(
-                                        text = subscription.author ?: "未知",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.let {
-                                            if (subscription.author == null) {
-                                                it.copy(alpha = 0.5f)
-                                            } else {
-                                                it
-                                            }
-                                        },
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                } else {
-                                    Text(
-                                        text = META.appName,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.secondary,
-                                    )
-                                }
+                                Text(
+                                    text = subscription.author ?: "未知",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.let {
+                                        if (subscription.author == null) {
+                                            it.copy(alpha = 0.5f)
+                                        } else {
+                                            it
+                                        }
+                                    },
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                                 Text(
                                     text = subsItem.mtimeStr,
                                     style = MaterialTheme.typography.labelMedium,
@@ -204,7 +194,7 @@ class SubsSheetState {
                                 )
                             }
                         }
-                        if (subscription.appGroups.isNotEmpty() || subsItem.isLocal) {
+                        if (subscription.appGroups.isNotEmpty()) {
                             Row(
                                 modifier = Modifier
                                     .clickable(onClickLabel = "查看应用规则列表", onClick = throttle {
@@ -240,7 +230,7 @@ class SubsSheetState {
                             }
 
                         }
-                        if (!subsItem.isLocal && subsItem.updateUrl != null) {
+                        if (subsItem.updateUrl != null) {
                             Row(
                                 modifier = Modifier
                                     .clickable(onClickLabel = "编辑订阅链接", onClick = throttle {
@@ -318,7 +308,7 @@ class SubsSheetState {
                         modifier = childModifier,
                         horizontalArrangement = Arrangement.End
                     ) {
-                        if (!subsItem.isLocal && subscription?.supportUri != null) {
+                        if (subscription?.supportUri != null) {
                             PerfIconButton(
                                 imageVector = PerfIcon.HelpOutline,
                                 onClick = throttle {
@@ -330,27 +320,25 @@ class SubsSheetState {
                             closeImmediately()
                             mainVm.navigatePage(ActionLogRoute(subsId = subsItem.id))
                         })
-                        if (subsItem.id != LOCAL_SUBS_ID) {
-                            PerfIconButton(
-                                imageVector = PerfIcon.Delete,
-                                onClick = throttle {
-                                    scope.launchTry {
-                                        if (!mainVm.dialogRequests.confirm(
-                                            title = "删除订阅",
-                                            text = "确定删除 ${subscription?.name ?: subsItem.id} ?",
-                                            error = true,
-                                        )) return@launchTry
-                                        val result = vm.deleteSubscriptionItem(subsItem.id)
-                                        result.message?.let {
-                                            toast(it)
-                                        }
-                                        if (result is SubscriptionResult.Success) {
-                                            closeImmediately()
-                                        }
+                        PerfIconButton(
+                            imageVector = PerfIcon.Delete,
+                            onClick = throttle {
+                                scope.launchTry {
+                                    if (!mainVm.dialogRequests.confirm(
+                                        title = "删除订阅",
+                                        text = "确定删除 ${subscription?.name ?: subsItem.id} ?",
+                                        error = true,
+                                    )) return@launchTry
+                                    val result = vm.deleteSubscriptionItem(subsItem.id)
+                                    result.message?.let {
+                                        toast(it)
                                     }
-                                },
-                            )
-                        }
+                                    if (result is SubscriptionResult.Success) {
+                                        closeImmediately()
+                                    }
+                                }
+                            },
+                        )
                     }
                     Spacer(modifier = Modifier.height(EmptyHeight / 2))
                 }

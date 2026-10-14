@@ -175,23 +175,6 @@ class RuleGroupState(
         return "已重置开关至默认值"
     }
 
-    private suspend fun deleteGroup(
-        state: ShowGroupState,
-    ) {
-        val groupKey = requireNotNull(state.groupKey)
-        val appId = requireNotNull(state.appId)
-        SubscriptionStore.update(state.subsId) { subscription ->
-            subscription.edit {
-                if (subscription.apps.none { it.id == appId }) {
-                    error("应用规则已不存在")
-                }
-                if (removeAppGroups(appId) { it.key == groupKey }.isEmpty()) {
-                    error("规则已不存在")
-                }
-            }
-        }
-    }
-
     private suspend fun saveChangedExclude(
         session: ExcludeEditSession,
         subscription: RawSubscription,
@@ -234,19 +217,6 @@ class RuleGroupState(
                         }
                     }
                 },
-                onClickDelete = mainVm.scope.launchAsFn {
-                    val r = mainVm.dialogRequests.confirm(
-                        title = "删除规则",
-                        text = "确定删除 ${showGroup.name} ?",
-                        error = true,
-                    )
-                    if (!r) {
-                        return@launchAsFn
-                    }
-                    deleteGroup(showGroupState)
-                    dismissGroupShow()
-                    toast("删除成功")
-                }
             )
         }
 

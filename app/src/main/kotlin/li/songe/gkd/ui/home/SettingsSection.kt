@@ -1,70 +1,46 @@
 package li.songe.gkd.ui.home
 
-import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import li.songe.gkd.MainActivity
-import li.songe.gkd.R
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.AboutRoute
 import li.songe.gkd.ui.component.AppAlertDialog
-import li.songe.gkd.ui.component.PerfCustomIconButton
 import li.songe.gkd.ui.component.PerfIcon
 import li.songe.gkd.ui.component.PerfIconButton
-import li.songe.gkd.ui.component.PerfTopAppBar
 import li.songe.gkd.ui.component.SettingItem
-import li.songe.gkd.ui.component.SettingsDialog
-import li.songe.gkd.ui.component.TextListDialog
 import li.songe.gkd.ui.component.TextSwitch
 import li.songe.gkd.ui.component.autoFocus
-import li.songe.gkd.ui.component.rememberColumnScrollState
 import li.songe.gkd.ui.share.LocalMainViewModel
-import li.songe.gkd.ui.style.EmptyHeight
-import li.songe.gkd.ui.style.iconTextSize
-import li.songe.gkd.ui.style.itemHorizontalPadding
 import li.songe.gkd.ui.style.titleItemPadding
+import li.songe.gkd.util.HOME_PAGE_URL
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.throttle
 import li.songe.gkd.util.toast
 
-private const val ZIP_MIME_TYPE = "application/zip"
-
 @Composable
-fun useSettingsPage(): ScaffoldExt {
+fun SettingsSection() {
     val mainVm = LocalMainViewModel.current
-    val context = LocalActivity.current as MainActivity
-    val vm = viewModel<SettingsVm>()
+    val vm = viewModel<HomeVm>()
     val store by storeFlow.collectAsStateWithLifecycle()
-    val actionScope = vm.scope
     val showToastInputDlg by vm.showActionToastDialogFlow.collectAsStateWithLifecycle()
+    val actionScope = vm.scope
 
     if (showToastInputDlg) {
         var value by remember {
@@ -135,78 +111,71 @@ fun useSettingsPage(): ScaffoldExt {
         )
     }
 
-    val pageScrollState = rememberColumnScrollState()
-    val scrollBehavior = pageScrollState.scrollBehavior
-    val scrollState = pageScrollState.scrollState
-    ResetPageScrollOnRequest(BottomNavItem.Settings, pageScrollState::resetScrollAndAwait)
-    return ScaffoldExt(
-        navItem = BottomNavItem.Settings,
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            PerfTopAppBar(
-                scrollBehavior = scrollBehavior,
-                title = {
-                    Text(
-                        text = BottomNavItem.Settings.label,
-                    )
-                },
-            )
-        },
-    ) { contentPadding ->
-        Column(
-            modifier = Modifier
-                .verticalScroll(scrollState)
-                .padding(contentPadding)
-        ) {
-
-            Text(
-                text = "常规",
-                modifier = Modifier.titleItemPadding(showTop = false),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            TextSwitch(
-                title = "触发提示",
-                subtitle = store.actionToast,
-                checked = store.toastWhenClick,
-                onClickLabel = "打开触发提示弹窗",
-                onClick = {
-                    vm.setActionToastDialogVisible(true)
-                },
-                onCheckedChange = {
-                    vm.setToastWhenClick(it)
-                })
-
-            TextSwitch(
-                title = "后台隐藏",
-                subtitle = "在「最近任务」隐藏卡片",
-                checked = store.excludeFromRecents,
-                onCheckedChange = { enabled ->
-                    actionScope.launchTry {
-                        if (enabled) {
-                            if (!mainVm.dialogRequests.confirm(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "常规",
+            modifier = Modifier.titleItemPadding(),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        TextSwitch(
+            title = "规则匹配",
+            subtitle = "关闭后不再执行任何规则",
+            checked = store.enableMatch,
+            onCheckedChange = { vm.setEnableMatch(it) },
+        )
+        TextSwitch(
+            title = "触发提示",
+            subtitle = store.actionToast,
+            checked = store.toastWhenClick,
+            onClickLabel = "打开触发提示弹窗",
+            onClick = {
+                vm.setActionToastDialogVisible(true)
+            },
+            onCheckedChange = {
+                vm.setToastWhenClick(it)
+            })
+        TextSwitch(
+            title = "后台隐藏",
+            subtitle = "在「最近任务」隐藏卡片",
+            checked = store.excludeFromRecents,
+            onCheckedChange = { enabled ->
+                actionScope.launchTry {
+                    if (enabled) {
+                        if (!mainVm.dialogRequests.confirm(
                                 title = "后台隐藏",
                                 text = "隐藏卡片后可能导致部分设备无法给任务卡片加锁后台，建议先加锁后再隐藏，若已加锁或没有锁后台机制请继续",
                                 confirmText = "继续",
                             )) return@launchTry
-                        }
-                        vm.setExcludeFromRecents(enabled)
                     }
-                })
-
-            Text(
-                text = "其他",
-                modifier = Modifier.titleItemPadding(),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-
-            SettingItem(title = "关于", onClick = {
-                mainVm.navigatePage(AboutRoute)
+                    vm.setExcludeFromRecents(enabled)
+                }
             })
 
-            Spacer(modifier = Modifier.height(EmptyHeight))
-        }
+        Text(
+            text = "其他",
+            modifier = Modifier.titleItemPadding(),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+
+        SettingItem(
+            title = "订阅设置",
+            onClickLabel = "打开订阅设置弹窗",
+            onClick = {
+                vm.setSettingsDialogVisible(true)
+            })
+
+        SettingItem(title = "关于", onClick = {
+            mainVm.navigatePage(AboutRoute)
+        })
+
+        SettingItem(
+            title = "了解 GKD",
+            subtitle = "查阅规则文档和常见问题",
+            onClickLabel = "打开 GKD 文档页面",
+            onClick = {
+                mainVm.openWebPage(HOME_PAGE_URL)
+            })
     }
 }
-

@@ -1,6 +1,5 @@
 package li.songe.gkd.ui.home
 
-import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,10 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,203 +24,110 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import li.songe.gkd.MainActivity
-import li.songe.gkd.R
 import li.songe.gkd.data.SubsConfig
 import li.songe.gkd.permission.PermissionStates
-import li.songe.gkd.priv.PrivilegeServiceStatus
-import li.songe.gkd.priv.privilegeServiceStatusFlow
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.service.switchAutomatorService
 import li.songe.gkd.ui.ActionLogRoute
 import li.songe.gkd.ui.PrivilegeServiceRoute
 import li.songe.gkd.ui.component.GroupNameText
 import li.songe.gkd.ui.component.PerfIcon
-import li.songe.gkd.ui.component.PerfIconButton
 import li.songe.gkd.ui.component.PerfSwitch
-import li.songe.gkd.ui.component.PerfTopAppBar
 import li.songe.gkd.ui.component.textSize
-import li.songe.gkd.ui.component.rememberColumnScrollState
 import li.songe.gkd.ui.share.LocalMainViewModel
-import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.itemHorizontalPadding
 import li.songe.gkd.ui.style.itemVerticalPadding
 import li.songe.gkd.ui.style.surfaceCardColors
-import li.songe.gkd.util.HOME_PAGE_URL
 import li.songe.gkd.util.latestRecordDescFlow
 import li.songe.gkd.util.latestRecordFlow
 import li.songe.gkd.util.openA11ySettings
 import li.songe.gkd.util.throttle
 
 @Composable
-fun useDashboardPage(): ScaffoldExt {
-    val context = LocalActivity.current as MainActivity
+fun ServiceStatusSection() {
     val mainVm = LocalMainViewModel.current
-    val vm = viewModel<DashboardVm>()
-    val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
-    val privilegeServiceStatus by privilegeServiceStatusFlow.collectAsStateWithLifecycle()
-    val pageScrollState = rememberColumnScrollState()
-    val scrollBehavior = pageScrollState.scrollBehavior
-    val scrollState = pageScrollState.scrollState
-    ResetPageScrollOnRequest(BottomNavItem.Dashboard, pageScrollState::resetScrollAndAwait)
-    return ScaffoldExt(
-        navItem = BottomNavItem.Dashboard,
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            PerfTopAppBar(scrollBehavior = scrollBehavior, title = {
-                Text(
-                    text = stringResource(R.string.app_name)
-                )
-            }, actions = {
-                val (contentDescription, contentColor) = when (privilegeServiceStatus) {
-                    PrivilegeServiceStatus.Connected -> "特权服务，已连接" to MaterialTheme.colorScheme.primary
-                    PrivilegeServiceStatus.Disconnected -> "特权服务，未连接" to MaterialTheme.colorScheme.onSurfaceVariant
-                    PrivilegeServiceStatus.DisconnectedDesired -> "特权服务，连接已中断" to MaterialTheme.colorScheme.error
-                }
-                PerfIconButton(
-                    imageVector = PerfIcon.RocketLaunch,
-                    onClickLabel = "前往特权服务页面",
-                    contentDescription = contentDescription,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = contentColor,
-                    ),
-                    onClick = throttle {
-                        mainVm.navigatePage(PrivilegeServiceRoute)
+    val a11yRunning by A11yService.isRunning.collectAsStateWithLifecycle()
+    val writeSecureSettings by PermissionStates.writeSecureSettings.stateFlow.collectAsStateWithLifecycle()
+    Column(
+        modifier = Modifier.padding(horizontal = itemHorizontalPadding),
+        verticalArrangement = Arrangement.spacedBy(itemHorizontalPadding / 2)
+    ) {
+        if (PermissionStates.appOpsRestrictedFlow.collectAsStateWithLifecycle().value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics(mergeDescendants = true) {
+                        this.onClick(label = "前往特权服务页面", action = null)
                     },
-                )
-            })
-        }) { contentPadding ->
-        val a11yRunning by A11yService.isRunning.collectAsStateWithLifecycle()
-        val writeSecureSettings by PermissionStates.writeSecureSettings.stateFlow.collectAsStateWithLifecycle()
-
-        Column(
-            modifier = Modifier
-                .verticalScroll(scrollState)
-                .padding(contentPadding)
-                .padding(horizontal = itemHorizontalPadding),
-            verticalArrangement = Arrangement.spacedBy(itemHorizontalPadding / 2)
-        ) {
-            if (PermissionStates.appOpsRestrictedFlow.collectAsStateWithLifecycle().value) {
-                Card(
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                onClick = throttle {
+                    mainVm.navigatePage(PrivilegeServiceRoute)
+                },
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics(mergeDescendants = true) {
-                            this.onClick(label = "前往特权服务页面", action = null)
-                        },
-                    shape = MaterialTheme.shapes.large,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    onClick = throttle {
-                        mainVm.navigatePage(PrivilegeServiceRoute)
-                    },
+                        .padding(itemVerticalPadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(itemVerticalPadding),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        PerfIcon(imageVector = PerfIcon.WarningAmber)
-                        Text(
-                            modifier = Modifier.weight(1f),
-                            text = "检测到权限受限，请前往特权服务",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        PerfIcon(imageVector = PerfIcon.KeyboardArrowRight)
-                    }
+                    PerfIcon(imageVector = PerfIcon.WarningAmber)
+                    Text(
+                        modifier = Modifier.weight(1f),
+                        text = "检测到权限受限，请前往特权服务",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    PerfIcon(imageVector = PerfIcon.KeyboardArrowRight)
                 }
             }
-            ServiceStatusCard(
-                subtitle = if (a11yRunning) {
-                    "无障碍正在运行"
-                } else if (mainVm.a11yServiceEnabledFlow.collectAsStateWithLifecycle().value) {
-                    "无障碍发生故障"
-                } else if (writeSecureSettings) {
-                    "无障碍已关闭"
-                } else {
-                    "无障碍未授权"
-                },
-                checked = a11yRunning,
-                onCheckedChange = { newEnabled ->
-                    if (newEnabled && !PermissionStates.writeSecureSettings.value) {
-                        openA11ySettings()
-                    } else {
-                        switchAutomatorService()
-                    }
-                },
-            )
-
-            val latestRecord by latestRecordFlow.collectAsStateWithLifecycle()
-            val latestRecordDesc by latestRecordDescFlow.collectAsStateWithLifecycle()
-            TriggerOverviewCard(
-                subsStatus = subsStatus,
-                latestRecordDesc = latestRecordDesc,
-                latestRecordIsGlobal = latestRecord?.groupType == SubsConfig.GlobalGroupType,
-                onOpenActionLog = { mainVm.navigatePage(ActionLogRoute()) },
-                onOpenLatestRecord = {
-                    latestRecord?.let {
-                        mainVm.navigatePage(ActionLogRoute(appId = it.appId))
-                    }
-                },
-            )
-
-            PageItemCard(
-                title = "了解 GKD",
-                subtitle = "查阅规则文档和常见问题",
-                imageVector = PerfIcon.HelpOutline,
-                onClickLabel = "打开 GKD 文档页面",
-                onClick = {
-                    mainVm.openWebPage(HOME_PAGE_URL)
-                })
-            Spacer(modifier = Modifier.height(EmptyHeight))
         }
+        ServiceStatusCard(
+            subtitle = if (a11yRunning) {
+                "无障碍正在运行"
+            } else if (mainVm.a11yServiceEnabledFlow.collectAsStateWithLifecycle().value) {
+                "无障碍发生故障"
+            } else if (writeSecureSettings) {
+                "无障碍已关闭"
+            } else {
+                "无障碍未授权"
+            },
+            checked = a11yRunning,
+            onCheckedChange = { newEnabled ->
+                if (newEnabled && !PermissionStates.writeSecureSettings.value) {
+                    openA11ySettings()
+                } else {
+                    switchAutomatorService()
+                }
+            },
+        )
     }
 }
 
-
 @Composable
-private fun PageItemCard(
-    imageVector: ImageVector,
-    title: String,
-    subtitle: String,
-    onClickLabel: String,
-    onClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics {
-                this.onClick(label = onClickLabel, action = null)
-            },
-        shape = MaterialTheme.shapes.large,
-        colors = surfaceCardColors,
-        onClick = throttle(fn = onClick)
-    ) {
-        IconTextCard(
-            imageVector = imageVector,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+fun TriggerRecordSection() {
+    val mainVm = LocalMainViewModel.current
+    val vm = viewModel<HomeVm>()
+    val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
+    val latestRecord by latestRecordFlow.collectAsStateWithLifecycle()
+    val latestRecordDesc by latestRecordDescFlow.collectAsStateWithLifecycle()
+    TriggerOverviewCard(
+        modifier = Modifier.padding(horizontal = itemHorizontalPadding),
+        subsStatus = subsStatus,
+        latestRecordDesc = latestRecordDesc,
+        latestRecordIsGlobal = latestRecord?.groupType == SubsConfig.GlobalGroupType,
+        onOpenActionLog = { mainVm.navigatePage(ActionLogRoute()) },
+        onOpenLatestRecord = {
+            latestRecord?.let {
+                mainVm.navigatePage(ActionLogRoute(appId = it.appId))
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -303,9 +207,10 @@ private fun TriggerOverviewCard(
     latestRecordIsGlobal: Boolean,
     onOpenActionLog: () -> Unit,
     onOpenLatestRecord: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = surfaceCardColors,
     ) {

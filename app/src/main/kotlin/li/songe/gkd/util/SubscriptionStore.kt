@@ -20,6 +20,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 
+// 历史版本内置的本地订阅 id, 仅用于清理旧版本残留数据
+private const val LEGACY_LOCAL_SUBS_ID = -2L
+
 data class LoadedSubscription(
     val value: RawSubscription,
     val updateError: Exception?,
@@ -56,6 +59,7 @@ object SubscriptionStore {
         get() = updateMutex.mutex.isLocked
 
     suspend fun initialize() = withContext(Dispatchers.IO) {
+        removeLegacyLocalSubscription()
         updateMutex.withStateLock {
             snapshotFlow.value = Loadable.Loading
             try {
@@ -68,46 +72,34 @@ object SubscriptionStore {
                 throw e
             }
         }
-        ensureLocalSubscription()
     }
 
-    private suspend fun ensureLocalSubscription() = withContext(Dispatchers.IO) {
-        updateMutex.withStateLock {
-            try {
-                val items = DbSet.subsItemDao.queryAll()
-                if (snapshotFlow.value !is Loadable.Ready) {
-                    refreshRawSubscriptions(
-                        items = items,
-                        previous = SubscriptionSnapshot(),
-                    )
+    // 历史版本内置了本地订阅, 现已移除, 启动时清理残留的订阅项/配置/日志与文件
+    private suspend fun removeLegacyLocalSubscription() = withContext(Dispatchers.IO) {
+        val id = LEGACY_LOCAL_SUBS_ID
+        val deletedSize = try {
+            DbSet.withTransaction {
+                val size = DbSet.subsItemDao.deleteById(id)
+                if (size > 0) {
+                    DbSet.subsConfigDao.deleteBySubsId(id)
+                    DbSet.actionLogDao.deleteBySubsId(id)
+                    DbSet.categoryConfigDao.deleteBySubsId(id)
                 }
-                if (items.any { it.id == LOCAL_SUBS_ID }) return@withStateLock
-                val item = SubsItem(
-                    id = LOCAL_SUBS_ID,
-                    order = items.minByOrNull { it.order }?.order ?: 0,
-                )
-                val file = subsFolder.resolve("$LOCAL_SUBS_ID.json")
-                if (file.exists()) {
-                    DbSet.subsItemDao.insert(item)
-                    refreshRawSubscriptions(listOf(item))
-                } else {
-                    saveLocked(
-                        subscription = RawSubscription(
-                            id = LOCAL_SUBS_ID,
-                            name = "本地订阅",
-                            version = 0,
-                        ),
-                        newItem = item,
-                        insertItem = true,
-                    )
-                }
-            } catch (e: Exception) {
-                if (snapshotFlow.value !is Loadable.Ready) {
-                    snapshotFlow.value = Loadable.Failure(e)
-                }
-                throw e
+                size
             }
+        } catch (e: Exception) {
+            LogUtils.d("清理本地订阅数据失败", e.message)
+            return@withContext
         }
+        if (deletedSize == 0) return@withContext
+        runCatching {
+            val file = subsFolder.resolve("$id.json")
+            AtomicFile(file).delete()
+            if (file.exists()) throw IOException("无法删除 ${file.name}")
+        }.exceptionOrNull()?.let {
+            LogUtils.d("清理本地订阅文件失败", it.message)
+        }
+        LogUtils.d("已清理历史本地订阅")
     }
 
     suspend fun awaitSnapshot(): SubscriptionSnapshot {
@@ -345,13 +337,13 @@ object SubscriptionStore {
                 previous = currentSnapshot ?: SubscriptionSnapshot(),
             )
             val entries = buildSubsEntries(items, snapshot.subscriptions)
-            if (entries.any { !it.subsItem.isLocal } && !NetworkUtils.isAvailable()) {
+            if (entries.isNotEmpty() && !NetworkUtils.isAvailable()) {
                 result = SubscriptionResult.Failure("网络不可用")
                 return@withStateLock
             }
             LogUtils.d("开始检测更新")
             var successCount = 0
-            entries.filter { !it.subsItem.isLocal }.forEach { entry ->
+            entries.forEach { entry ->
                 try {
                     val subscription = fetchUpdate(entry)
                     if (subscription != null) {
@@ -384,20 +376,9 @@ object SubscriptionStore {
                 items = DbSet.subsItemDao.queryAll(),
                 previous = SubscriptionSnapshot(),
             )
-        val nextSubscription = if (
-            id < 0 && snapshot.subscriptions[id]?.version == subscription.version
-        ) {
-            subscription.copy(
-                version = subscription.version + 1,
-                apps = subscription.apps.filterIfNotAll { it.groups.isNotEmpty() }
-                    .distinctByIfAny { it.id },
-            )
-        } else {
-            subscription
-        }
         val file = subsFolder.resolve("$id.json")
         val previousBytes = file.takeIf { it.exists() }?.readBytes()
-        writeAtomic(file, json.encodeToString(nextSubscription).encodeToByteArray())
+        writeAtomic(file, json.encodeToString(subscription).encodeToByteArray())
         try {
             DbSet.withTransaction {
                 if (newItem != null) {
@@ -408,7 +389,7 @@ object SubscriptionStore {
                     }
                 }
                 DbSet.subsItemDao.updateMtime(id, System.currentTimeMillis())
-                cleanupConfigs(id, nextSubscription)
+                cleanupConfigs(id, subscription)
             }
         } catch (e: Exception) {
             runCatching {
@@ -422,12 +403,12 @@ object SubscriptionStore {
         }
         snapshotFlow.value = Loadable.Ready(snapshot.copy(
             subscriptions = snapshot.subscriptions.toMutableMap().apply {
-                set(id, nextSubscription)
+                set(id, subscription)
             },
             loadErrors = snapshot.loadErrors.toMutableMap().apply { remove(id) },
             updateErrors = snapshot.updateErrors.toMutableMap().apply { remove(id) },
         ))
-        LogUtils.d("更新订阅文件:id=$id,name=${nextSubscription.name}")
+        LogUtils.d("更新订阅文件:id=$id,name=${subscription.name}")
     }
 
     private fun filterSplashGroups(subscription: RawSubscription): RawSubscription {
@@ -483,12 +464,7 @@ object SubscriptionStore {
 
     private fun load(id: Long): RawSubscription {
         val file = subsFolder.resolve("$id.json")
-        if (!file.exists()) {
-            return when (id) {
-                LOCAL_SUBS_ID -> RawSubscription(id = id, name = "本地订阅", version = 0)
-                else -> error("订阅文件不存在")
-            }
-        }
+        if (!file.exists()) error("订阅文件不存在")
         val subscription = try {
             RawSubscription.parse(file.readText(), json5 = false)
         } catch (e: Exception) {
@@ -565,7 +541,7 @@ object SubscriptionStore {
     private suspend fun fetchUpdate(entry: SubsEntry): RawSubscription? {
         val item = entry.subsItem
         val current = entry.subscription
-        if (item.updateUrl == null || item.id < 0) return null
+        if (item.updateUrl == null) return null
         val checkUrl = entry.checkUpdateUrl
         if (checkUrl != null && current != null) {
             try {

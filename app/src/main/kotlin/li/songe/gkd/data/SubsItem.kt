@@ -11,7 +11,6 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
-import li.songe.gkd.util.LOCAL_SUBS_ID
 import li.songe.gkd.util.format
 
 @Serializable
@@ -27,11 +26,7 @@ data class SubsItem(
     @ColumnInfo(name = "enable_update") val enableUpdate: Boolean = true,
     @ColumnInfo(name = "order") val order: Int,
     @ColumnInfo(name = "update_url") val updateUrl: String? = null,
-
-    ) {
-
-    val isLocal: Boolean
-        get() = id == LOCAL_SUBS_ID
+) {
 
     val mtimeStr by lazy { mtime.format("yyyy-MM-dd HH:mm:ss") }
 

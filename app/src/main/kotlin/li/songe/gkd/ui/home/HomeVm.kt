@@ -14,16 +14,19 @@ import kotlinx.coroutines.flow.update
 import li.songe.gkd.data.RawSubscription
 import li.songe.gkd.data.SubsItem
 import li.songe.gkd.db.DbSet
+import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.storeFlow
 import li.songe.gkd.ui.share.BaseViewModel
 import li.songe.gkd.ui.share.Loadable
 import li.songe.gkd.util.SubscriptionResult
 import li.songe.gkd.util.SubscriptionSnapshot
 import li.songe.gkd.util.SubscriptionStore
+import li.songe.gkd.util.getSubsStatus
 import li.songe.gkd.util.launchTry
+import li.songe.gkd.util.ruleSummaryFlow
 import li.songe.gkd.util.toast
 
-data class SubsManageUiState(
+data class HomeSubsUiState(
     val subItems: List<SubsItem>,
     val subscriptions: Map<Long, RawSubscription>,
     val refreshing: Boolean,
@@ -31,11 +34,11 @@ data class SubsManageUiState(
     val refreshErrors: Map<Long, Exception>,
 )
 
-private fun buildSubsManageUiState(
+private fun buildHomeSubsUiState(
     subItems: List<SubsItem>,
     snapshot: SubscriptionSnapshot,
     refreshing: Boolean,
-) = SubsManageUiState(
+) = HomeSubsUiState(
     subItems = subItems,
     subscriptions = snapshot.subscriptions,
     refreshing = refreshing,
@@ -43,13 +46,20 @@ private fun buildSubsManageUiState(
     refreshErrors = snapshot.updateErrors,
 )
 
-class SubsManageVm : BaseViewModel() {
+class HomeVm : BaseViewModel() {
+
+    val subsStatusFlow = combine(ruleSummaryFlow, actionCountFlow) { ruleSummary, count ->
+        getSubsStatus(ruleSummary, count)
+    }.stateInit(getSubsStatus(ruleSummaryFlow.value, actionCountFlow.value))
+
     val settingsDialogVisibleFlow: StateFlow<Boolean>
         field = MutableStateFlow(false)
     val powerWarningItemFlow: StateFlow<SubsItem?>
         field = MutableStateFlow(null)
+    val showActionToastDialogFlow: StateFlow<Boolean>
+        field = MutableStateFlow(false)
 
-    val uiState: StateFlow<Loadable<SubsManageUiState>> =
+    val uiState: StateFlow<Loadable<HomeSubsUiState>> =
         SubscriptionStore.snapshotFlow.flatMapLatest { snapshotState ->
             when (snapshotState) {
                 Loadable.Loading -> flowOf(Loadable.Loading)
@@ -58,12 +68,12 @@ class SubsManageVm : BaseViewModel() {
                     DbSet.subsItemDao.query(),
                     SubscriptionStore.updating,
                 ) { subItems, refreshing ->
-                    buildSubsManageUiState(
+                    buildHomeSubsUiState(
                         subItems = subItems,
                         snapshot = snapshotState.value,
                         refreshing = refreshing,
                     )
-                }.map<SubsManageUiState, Loadable<SubsManageUiState>> { Loadable.Ready(it) }
+                }.map<HomeSubsUiState, Loadable<HomeSubsUiState>> { Loadable.Ready(it) }
                     .catch { emit(Loadable.Failure(it)) }
             }
         }.stateIn(scope, SharingStarted.Eagerly, Loadable.Loading)
@@ -80,8 +90,8 @@ class SubsManageVm : BaseViewModel() {
         settingsDialogVisibleFlow.value = visible
     }
 
-    fun toggleMatching() {
-        storeFlow.update { it.copy(enableMatch = !it.enableMatch) }
+    fun setEnableMatch(enabled: Boolean) {
+        storeFlow.update { it.copy(enableMatch = enabled) }
     }
 
     fun refresh() {
@@ -96,11 +106,9 @@ class SubsManageVm : BaseViewModel() {
     private fun shouldWarnBeforeEnabling(item: SubsItem): Boolean {
         val state = uiState.value.value ?: return false
         return storeFlow.value.subsPowerWarn &&
-            !item.isLocal &&
             state.subItems.any { current ->
                 current.id != item.id &&
                     current.enable &&
-                    !current.isLocal &&
                     state.subscriptions[current.id]?.hasRule != false
             }
     }
@@ -133,4 +141,22 @@ class SubsManageVm : BaseViewModel() {
         url: String,
         oldItem: SubsItem? = null,
     ): SubscriptionResult = SubscriptionStore.addOrModifyRemote(url, oldItem)
+
+    fun setActionToastDialogVisible(visible: Boolean) {
+        showActionToastDialogFlow.value = visible
+    }
+
+    fun saveActionToast(value: String): Boolean {
+        if (value == storeFlow.value.actionToast) return false
+        storeFlow.update { it.copy(actionToast = value) }
+        return true
+    }
+
+    fun setToastWhenClick(enabled: Boolean) {
+        storeFlow.update { it.copy(toastWhenClick = enabled) }
+    }
+
+    fun setExcludeFromRecents(enabled: Boolean) {
+        storeFlow.update { it.copy(excludeFromRecents = enabled) }
+    }
 }

@@ -15,7 +15,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import li.songe.gkd.a11y.selectorTypeModel
-import li.songe.gkd.util.LOCAL_SUBS_ID
 import li.songe.gkd.util.LogUtils
 import li.songe.gkd.util.ScreenUtils
 import li.songe.gkd.util.appInfoMapFlow
@@ -55,9 +54,6 @@ data class RawSubscription(
     override fun hashCode(): Int {
         return Objects.hash(id, name, version)
     }
-
-    val isLocal: Boolean
-        get() = id == LOCAL_SUBS_ID
 
     val hasRule get() = globalGroups.isNotEmpty() || apps.any { it.groups.isNotEmpty() }
 

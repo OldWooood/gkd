@@ -7,7 +7,6 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import li.songe.gkd.a11y.useA11yServiceEnabledFlow
 import li.songe.gkd.a11y.useEnabledA11yServicesFlow
@@ -23,7 +22,6 @@ import li.songe.gkd.ui.component.ShowGroupState
 import li.songe.gkd.ui.component.SubsLinkDialogState
 import li.songe.gkd.ui.component.SubsSheetState
 import li.songe.gkd.ui.component.TextDialogState
-import li.songe.gkd.ui.home.BottomNavItem
 import li.songe.gkd.ui.home.HomeRoute
 import li.songe.gkd.ui.share.BaseViewModel
 import li.songe.gkd.ui.share.Loadable
@@ -41,11 +39,6 @@ import li.songe.gkd.util.openUri
 import li.songe.gkd.util.openWeChatScaner
 import li.songe.gkd.util.runMainPost
 import li.songe.gkd.util.toast
-
-data class PageScrollResetRequest(
-    val id: Long,
-    val navItem: BottomNavItem,
-)
 
 class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     companion object {
@@ -153,43 +146,12 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
         textDialog.showUrl(url)
     }
 
-    val tabFlow: StateFlow<Int>
-        field = MutableStateFlow(BottomNavItem.Dashboard.key)
-    val pageScrollResetRequestFlow: StateFlow<PageScrollResetRequest?>
-        field = MutableStateFlow(null)
-    private var nextPageScrollResetRequestId = 0L
-    private var lastClickTabTime = 0L
-    fun handleClickTab(navItem: BottomNavItem) {
-        val t = System.currentTimeMillis()
-        if (navItem.key != tabFlow.value) {
-            pageScrollResetRequestFlow.value = null
-        }
-        // double click
-        if (navItem.key == tabFlow.value && t - lastClickTabTime < 500) {
-            pageScrollResetRequestFlow.value = PageScrollResetRequest(
-                id = ++nextPageScrollResetRequestId,
-                navItem = navItem,
-            )
-        }
-        tabFlow.value = navItem.key
-        lastClickTabTime = t
-    }
-
-    fun consumePageScrollResetRequest(request: PageScrollResetRequest) {
-        pageScrollResetRequestFlow.compareAndSet(request, null)
-    }
-
     fun handleGkdUri(uri: Uri) {
         val notFoundToast = { toast("未知URI\n${uri}") }
         when (uri.host) {
             "page" -> when (uri.path) {
-                "" -> {
-                    val tab = uri.getQueryParameter("tab")?.toIntOrNull()
-                    if (tab != null && BottomNavItem.allSubObjects.any { it.key == tab }) {
-                        tabFlow.value = tab
-                    }
-                }
-
+                // 首页已合并为单页, 历史 tab 参数不再切换页面
+                "" -> Unit
                 "/3", "/4" -> navigatePage(PrivilegeServiceRoute)
                 else -> notFoundToast()
             }

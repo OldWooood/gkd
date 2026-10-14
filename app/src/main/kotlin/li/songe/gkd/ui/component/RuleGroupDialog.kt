@@ -43,7 +43,6 @@ fun RuleGroupDialog(
     onDismissRequest: () -> Unit,
     onClickEditExclude: () -> Unit,
     onClickResetSwitch: (() -> Unit)?,
-    onClickDelete: () -> Unit = {}
 ) {
     val mainVm = LocalMainViewModel.current
     val scrollState = rememberScrollState()
@@ -146,12 +145,6 @@ fun RuleGroupDialog(
                         imageVector = ResetSettings,
                         onClickLabel = "重置开关状态至默认值",
                         onClick = throttle(onClickResetSwitch ?: {}),
-                    )
-                }
-                if (subs.isLocal) {
-                    PerfIconButton(
-                        imageVector = PerfIcon.Delete,
-                        onClick = throttle(onClickDelete),
                     )
                 }
             }
