@@ -72,7 +72,7 @@ sealed class ActionPerformer(val action: String) {
                     )
                     A11yService.instance?.dispatchGesture(
                         gestureDescription.build(), null, null
-                    ) != null
+                    ) == true
                 },
                 position = x to y
             )
