@@ -1,5 +1,12 @@
 # 更新内容
 
+- 特权通道改为直连官方 Shizuku API：移除 priv-kit 依赖及其常驻特权服务进程、外部启动桥、启动 AIDL 与 native starter，安装包缩小约 97 KB
+- 点击动作改为注入触摸事件（IInputManager.injectInputEvent）：不再依赖 ShizukuBinderWrapper 未实现的 IBinder.shellCommand，消除 Release 包隐藏接口被 R8 改名删参的隐患；仍保留点击节点 → 特权注入 → 无障碍手势的兜底顺序
+- 权限自助授予改用 IPackageManager.grantRuntimePermission（与私有服务端同一 API）；特权连接状态改为监听 Shizuku binder 出现与死亡，断开后立即回落纯无障碍模式
+- 修复特权点击失败时无障碍手势兜底结果被误判为成功的问题
+- 补回此前由 priv-kit manifest 合并带入的 ACCESS_LOCAL_NETWORK 权限声明
+- 注意：不再保留独立常驻特权进程，Shizuku 停止后特权能力立即失效（写安全设置、应用列表、任务栈回调与注入点击回落无障碍），Shizuku 恢复后自动重连
+
 - 新增特权空闲零投递：Shizuku 特权在线时，静止状态只保留界面切换事件，大幅减少待机唤醒与耗电；开屏窗口内保持全速匹配
 - 开屏匹配窗口由 5 秒延长至 8 秒，改善启动较慢应用的跳过成功率
 - 统一首页卡片样式：服务状态、触发记录、订阅条目、添加订阅的圆角与内边距保持一致
