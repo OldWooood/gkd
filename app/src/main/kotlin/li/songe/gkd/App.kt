@@ -34,7 +34,6 @@ import li.songe.gkd.util.SubscriptionStore
 import li.songe.gkd.util.launchTry
 import li.songe.gkd.util.toast
 import org.lsposed.hiddenapibypass.HiddenApiBypass
-import priv.kit.core.PrivilegeConfig
 import kotlin.system.exitProcess
 
 
@@ -96,10 +95,6 @@ class App : Application() {
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
-        PrivilegeConfig.configure(
-            followDeathDelayMillis = 0,
-            activeReconnectOnOwnerDeath = false,
-        )
         HiddenApiBypass.addHiddenApiExemptions("L")
     }
 
@@ -208,7 +203,7 @@ class App : Application() {
         initA11yFeat()
         initPrivilege()
         appScope.launchTry(Dispatchers.IO) {
-            ShizukuPrivilegeController.startSilently(this@App)
+            ShizukuPrivilegeController.startSilently()
         }
         appScope.launchTry(Dispatchers.IO) {
             SubscriptionStore.initialize()

@@ -64,7 +64,6 @@ android {
 
     buildFeatures {
         compose = true
-        aidl = true
         resValues = true
     }
 
@@ -121,8 +120,6 @@ android {
         includeInApk = false
         includeInBundle = false
     }
-    // https://priv-kit.pages.dev/zh/guide/getting-started#native-library-packaging
-    packaging.jniLibs.useLegacyPackaging = true
     packaging.resources.excludes += setOf(
         "META-INF/**",
         "DebugProbesKt.bin",
@@ -187,7 +184,6 @@ dependencies {
     compileOnly(project(":hidden-api"))
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)
-    implementation(libs.priv.kit.core)
     implementation(libs.lsposed.hiddenapibypass)
 
     implementation(libs.androidx.room.runtime)

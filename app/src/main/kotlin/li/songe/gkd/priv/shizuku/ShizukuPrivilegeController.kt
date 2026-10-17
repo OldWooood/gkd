@@ -1,20 +1,18 @@
 package li.songe.gkd.priv.shizuku
 
-import android.content.Context
 import android.content.pm.PackageManager
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeout
+import li.songe.gkd.app
+import li.songe.gkd.permission.PermissionStates
+import li.songe.gkd.priv.PrivilegeContext
+import li.songe.gkd.priv.PrivilegeStartupException
+import li.songe.gkd.priv.clearPrivilegeContext
+import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.priv.privilegeDesiredEnabledFlow
 import li.songe.gkd.util.LogUtils
-import priv.kit.core.Privilege
-import priv.kit.core.PrivilegeServerInfo
-import priv.kit.core.PrivilegeStartupException
-import priv.kit.core.internal.runtime.PrivilegeRuntimeStartCoordinator
+import li.songe.gkd.util.toast
 import rikka.shizuku.Shizuku
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
@@ -29,8 +27,7 @@ data class ShizukuState(
 
 object ShizukuPrivilegeController {
     private const val SHIZUKU_PERMISSION_REQUEST_CODE = 42
-    private const val START_TIMEOUT_MILLIS = 15_000L
-    private val startMutex = Mutex()
+    private val connectMutex = Mutex()
 
     fun state(): ShizukuState {
         if (!Shizuku.pingBinder()) {
@@ -53,15 +50,6 @@ object ShizukuPrivilegeController {
         }
         val version = Shizuku.getVersion()
         val uid = Shizuku.getUid().takeIf { it >= 0 }
-        if (version < PrivilegeShizukuExternalStarter.SHIZUKU_USER_SERVICE_MIN_VERSION) {
-            return ShizukuState(
-                available = false,
-                authorized = false,
-                uid = uid,
-                version = version,
-                message = "当前 Shizuku 版本不支持 UserService",
-            )
-        }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
             return ShizukuState(
                 available = true,
@@ -130,13 +118,8 @@ object ShizukuPrivilegeController {
         }
     }
 
-    val isConnected: Boolean get() = Privilege.pingServer()
-
-    suspend fun start(context: Context): PrivilegeServerInfo = startMutex.withLock {
-        if (Privilege.pingServer()) {
-            privilegeDesiredEnabledFlow.value = true
-            return checkNotNull(Privilege.serverState.value) { "特权服务未连接" }
-        }
+    suspend fun start(): PrivilegeContext = connectMutex.withLock {
+        privilegeContextFlow.value?.let { return@withLock it }
         val current = state()
         if (!current.available) {
             throw PrivilegeStartupException(current.message)
@@ -144,44 +127,41 @@ object ShizukuPrivilegeController {
         if (!current.authorized) {
             throw PrivilegeStartupException("请先授权 Shizuku")
         }
-        val coordinator = PrivilegeRuntimeStartCoordinator
-        val preflight = coordinator.beginPreflight()
-        val reconnectGrace = preflight.remainingReconnectGraceMillis
-        if (reconnectGrace > 0) {
-            delay(reconnectGrace)
+        if (!app.justStarted) {
+            toast("正在连接特权服务...")
         }
-        val lease = coordinator.tryCommitClientStart(preflight)
-            ?: throw PrivilegeStartupException("已有特权服务启动流程进行中")
-        try {
-            val launch = coordinator.beginClientLaunch(lease)
-                ?: throw PrivilegeStartupException("无法创建特权服务启动请求")
-            val commandLine = coordinator.createNativeStarterCommand(launch)
-            PrivilegeShizukuExternalStarter(context).use { starter ->
-                starter.start(commandLine)
-            }
-            val serverInfo = withTimeout(START_TIMEOUT_MILLIS) {
-                Privilege.serverState.filterNotNull().first()
-            }
-            privilegeDesiredEnabledFlow.value = true
-            return serverInfo
-        } finally {
-            lease.close()
-        }
+        val context = PrivilegeContext.create(
+            shizukuUid = current.uid ?: -1,
+            shizukuVersion = current.version ?: -1,
+        )
+        privilegeContextFlow.value = context
+        privilegeDesiredEnabledFlow.value = true
+        PermissionStates.refreshAll()
+        toast("特权服务连接成功", delayMillis = if (app.justStarted) 1200L else 0L)
+        context
     }
 
     fun stop() {
         privilegeDesiredEnabledFlow.value = false
-        if (Privilege.pingServer()) {
-            Privilege.shutdownServer()
-        }
+        disconnect()
     }
 
-    suspend fun startSilently(context: Context) {
+    /**
+     * Shizuku binder 死亡或用户主动停止时调用, 已授予的应用权限不受影响。
+     */
+    fun disconnect() {
+        val context = privilegeContextFlow.value ?: return
+        clearPrivilegeContext(context)
+        toast("特权服务已断开")
+    }
+
+    suspend fun startSilently() {
         if (!privilegeDesiredEnabledFlow.value) return
-        if (Privilege.pingServer()) return
-        if (!state().authorized) return
+        if (privilegeContextFlow.value != null) return
+        val current = state()
+        if (!current.available || !current.authorized) return
         try {
-            start(context)
+            start()
         } catch (e: Throwable) {
             LogUtils.d("silent privilege start failed", e)
         }

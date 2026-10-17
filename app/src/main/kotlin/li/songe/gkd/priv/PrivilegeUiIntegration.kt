@@ -5,7 +5,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import li.songe.gkd.appScope
 import li.songe.gkd.store.createTextFlow
-import priv.kit.core.Privilege
 
 enum class PrivilegeServiceStatus {
     Connected,
@@ -20,7 +19,6 @@ val privilegeDesiredEnabledFlow = createTextFlow(
 )
 
 val privilegeServiceStatusFlow by lazy {
-    val serverState = Privilege.serverState
     val resolve = { connected: Boolean, desired: Boolean ->
         when {
             connected -> PrivilegeServiceStatus.Connected
@@ -28,11 +26,11 @@ val privilegeServiceStatusFlow by lazy {
             else -> PrivilegeServiceStatus.Disconnected
         }
     }
-    combine(serverState, privilegeDesiredEnabledFlow) { serverInfo, desired ->
-        resolve(serverInfo != null, desired)
+    combine(privilegeContextFlow, privilegeDesiredEnabledFlow) { context, desired ->
+        resolve(context != null, desired)
     }.stateIn(
         appScope,
         SharingStarted.Eagerly,
-        resolve(serverState.value != null, privilegeDesiredEnabledFlow.value),
+        resolve(privilegeContextFlow.value != null, privilegeDesiredEnabledFlow.value),
     )
 }

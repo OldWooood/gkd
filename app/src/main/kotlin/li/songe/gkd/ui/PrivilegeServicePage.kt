@@ -25,12 +25,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.priv.privilegeDesiredEnabledFlow
 import li.songe.gkd.priv.shizuku.ShizukuPrivilegeController
 import li.songe.gkd.ui.component.AppAlertDialog
@@ -42,7 +42,6 @@ import li.songe.gkd.ui.style.EmptyHeight
 import li.songe.gkd.ui.style.itemHorizontalPadding
 import li.songe.gkd.ui.style.titleItemPadding
 import li.songe.gkd.util.throttle
-import priv.kit.core.Privilege
 
 @Serializable
 data object PrivilegeServiceRoute : NavKey
@@ -50,16 +49,15 @@ data object PrivilegeServiceRoute : NavKey
 @Composable
 fun PrivilegeServicePage() {
     val mainVm = LocalMainViewModel.current
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val serverInfo by Privilege.serverState.collectAsStateWithLifecycle()
+    val privilegeContext by privilegeContextFlow.collectAsStateWithLifecycle()
     val desired by privilegeDesiredEnabledFlow.collectAsStateWithLifecycle()
     var shizukuState by remember { mutableStateOf(ShizukuPrivilegeController.state()) }
     var busy by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var showInfoDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(serverInfo) {
+    LaunchedEffect(privilegeContext) {
         shizukuState = ShizukuPrivilegeController.state()
     }
 
@@ -106,13 +104,13 @@ fun PrivilegeServicePage() {
                 color = MaterialTheme.colorScheme.primary,
             )
             StatusCard(
-                title = if (serverInfo != null) "特权服务已连接" else "特权服务未连接",
+                title = if (privilegeContext != null) "特权服务已连接" else "特权服务未连接",
                 desc = when {
-                    serverInfo != null -> "uid=${serverInfo?.uid}  pid=${serverInfo?.pid}"
+                    privilegeContext != null -> "uid=${privilegeContext?.shizukuUid}  version=${privilegeContext?.shizukuVersion}"
                     desired -> "已配置自动连接，等待 Shizuku 或应用启动后重试"
                     else -> "点击下方按钮启动特权服务"
                 },
-                error = serverInfo == null && desired,
+                error = privilegeContext == null && desired,
             )
 
             Text(
@@ -169,7 +167,7 @@ fun PrivilegeServicePage() {
                     Text(text = "授权 Shizuku")
                 }
             }
-            if (serverInfo == null) {
+            if (privilegeContext == null) {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !busy && shizukuState.authorized,
@@ -178,7 +176,7 @@ fun PrivilegeServicePage() {
                             busy = true
                             errorText = null
                             try {
-                                ShizukuPrivilegeController.start(context)
+                                ShizukuPrivilegeController.start()
                             } catch (e: Throwable) {
                                 errorText = e.message ?: e.javaClass.name
                             } finally {

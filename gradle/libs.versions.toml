@@ -14,7 +14,6 @@ coil = "3.5.0"
 telephoto = "0.19.0"
 remap = "0.1.4"
 shizuku = "13.1.5"
-priv-kit = "0.3.4"
 
 [libraries]
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -60,7 +59,6 @@ remap-processor = { module = "li.songe.remap:remap-processor", version.ref = "re
 remap-annotation = { module = "li.songe.remap:remap-annotation", version.ref = "remap" }
 rikka-shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 rikka-shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
-priv-kit-core = { module = "io.github.priv-kit:priv-core", version.ref = "priv-kit" }
 lsposed-hiddenapibypass = "org.lsposed.hiddenapibypass:hiddenapibypass:6.1"
 exp4j = "net.objecthunter:exp4j:0.4.8"
 json5 = "li.songe:json5:0.5.0"
