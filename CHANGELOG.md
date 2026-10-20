@@ -1,5 +1,9 @@
 # 更新内容
 
+- 修复切换应用后升档与开屏匹配延迟：修正 TaskStack 回调去重条件，A11y 状态事件可及时确认栈顶并触发匹配
+- 修复查询进行中到达的事件或延迟规则被丢弃，改为排队后在当前查询结束后补发
+- 优化空闲期事件处理：跨应用 content 事件恢复节流，轮询不再反复清空节点缓存，栈顶更新不再在锁内调用特权服务
+
 - 特权通道改为直连官方 Shizuku API：移除 priv-kit 依赖及其常驻特权服务进程、外部启动桥、启动 AIDL 与 native starter，安装包缩小约 97 KB
 - 点击动作改为注入触摸事件（IInputManager.injectInputEvent）：不再依赖 ShizukuBinderWrapper 未实现的 IBinder.shellCommand，消除 Release 包隐藏接口被 R8 改名删参的隐患；仍保留点击节点 → 特权注入 → 无障碍手势的兜底顺序
 - 权限自助授予改用 IPackageManager.grantRuntimePermission（与私有服务端同一 API）；特权连接状态改为监听 Shizuku binder 出现与死亡，断开后立即回落纯无障碍模式
