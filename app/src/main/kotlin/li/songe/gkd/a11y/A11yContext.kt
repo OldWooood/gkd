@@ -61,23 +61,27 @@ class A11yContext(
             rootCache.value = null
         }
         if (eventNode != null) {
-            clearChildCache(eventNode)
-            parentCache[eventNode]?.let { p ->
-                getPureIndex(eventNode)?.let { i ->
-                    childCache[p to i] = eventNode
-                }
-            }
             if (rootCache.value == eventNode) {
                 rootCache.value = eventNode
             } else {
-                if (META.debuggable) {
-                    Log.d(
-                        "cache",
-                        "clear node cache ${eventNode.packageName}/${eventNode.className}"
-                    )
+                val parentNode = parentCache[eventNode]
+                if (parentNode != null) {
+                    clearChildCache(eventNode)
+                    getPureIndex(eventNode)?.let { i ->
+                        childCache[parentNode to i] = eventNode
+                    }
+                    if (META.debuggable) {
+                        Log.d(
+                            "cache",
+                            "clear node cache ${eventNode.packageName}/${eventNode.className}"
+                        )
+                    }
+                    return
                 }
-                return
+                rootCache.value = null
             }
+        } else {
+            rootCache.value = null
         }
         if (META.debuggable) {
             val sizeList = listOf(childCache.size(), parentCache.size(), indexCache.size())

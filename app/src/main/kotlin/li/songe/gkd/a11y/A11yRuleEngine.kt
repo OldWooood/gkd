@@ -92,16 +92,17 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 scene = ActivityScene.ScreenOn
             )
         }
-        refreshDeliveryProfile()
-        startQueryJob()
     }
 
     fun onTopActivityChanged(idChanged: Boolean) {
+        if (idChanged) {
+            lastGetAppIdTime = 0L
+            lastAppId = null
+        }
+        a11yContext.interruptKey++
         scope.launch(actionDispatcher) {
             refreshDeliveryProfile()
-            if (idChanged) {
-                prewarmActiveWindow()
-            }
+            startQueryJob()
         }
     }
 
@@ -147,8 +148,12 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
 
         val a11yEvent = event.toA11yEvent() ?: return
         if (a11yEvent.type == CONTENT_CHANGED) {
-            // 防止 content 类型事件过快
-            if (a11yEvent.time - lastContentEventTime < 100 && a11yEvent.time - appChangeTime > SPLASH_ACTIVE_WINDOW && a11yEvent.time - lastTriggerTime > 3000) {
+            // 防止同应用空闲期 content 类型事件过快; 跨应用事件可能触发切应用升档, 不节流
+            if (
+                a11yEvent.appId == topActivityFlow.value.appId &&
+                a11yEvent.time - lastContentEventTime < 100 &&
+                !windowOrTailActive(a11yEvent.time)
+            ) {
                 return
             }
             lastContentEventTime = a11yEvent.time
@@ -176,26 +181,32 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     private suspend fun consumeEvent(headEvent: A11yEvent) {
         val consumedEvents = synchronized(eventDeque) {
             if (eventDeque.firstOrNull() !== headEvent) return
-            eventDeque.filter { it.sameAs(headEvent) }.apply {
-                repeat(size) { eventDeque.removeFirst() }
+            buildList {
+                val iterator = eventDeque.iterator()
+                while (iterator.hasNext()) {
+                    val e = iterator.next()
+                    if (e.sameAs(headEvent)) {
+                        add(e)
+                        iterator.remove()
+                    }
+                }
             }
         }
         val latestEvent = consumedEvents.last()
         val evAppId = latestEvent.appId
         val evActivityId = latestEvent.name
         val oldAppId = topActivityFlow.value.appId
+        val isActivityStateEvent = latestEvent.type == STATE_CHANGED && isActivity(evAppId, evActivityId)
         val rightAppId = if (oldAppId == evAppId) {
             evAppId
         } else {
-            getTimeoutAppId() ?: return
+            getTimeoutAppId(forceRefresh = isActivityStateEvent) ?: return
         }
         if (rightAppId == evAppId) {
-            if (latestEvent.type == STATE_CHANGED) {
+            if (isActivityStateEvent) {
                 synchronized(topActivityFlow) {
                     // tv.danmaku.bili, com.miui.home, com.miui.home.launcher.Launcher
-                    if (isActivity(evAppId, evActivityId)) {
-                        updateTopActivity(evAppId, evActivityId)
-                    }
+                    updateTopActivity(evAppId, evActivityId)
                 }
             }
         }
@@ -204,7 +215,11 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 // 从 锁屏，下拉通知栏 返回等情况, 应用不会发送事件, 但是系统组件会发送事件
                 val topCpn = privilegeContextFlow.value?.topCpn()
                 if (topCpn?.packageName == rightAppId) {
-                    updateTopActivity(topCpn.packageName, topCpn.className)
+                    updateTopActivity(
+                        topCpn.packageName,
+                        topCpn.className,
+                        scene = ActivityScene.TaskStack,
+                    )
                 } else {
                     updateTopActivity(rightAppId, null)
                 }
@@ -223,26 +238,27 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         startQueryJob(byEvent = latestEvent)
     }
 
+    @Volatile
     private var lastGetAppIdTime = 0L
+
+    @Volatile
     private var lastAppId: String? = null
-    private suspend fun getTimeoutAppId(): String? {
-        if (lastAppId != null && System.currentTimeMillis() - lastGetAppIdTime <= 100) return lastAppId
-        val privileged = privilegeContextFlow.value != null
-        // 特权空闲期禁止无障碍回落: 读取 root 会打开服务端缓存标志,
-        // 使 cache-critical 事件恢复投递, 破坏空闲零投递
-        val allowA11yFallback = !privileged ||
-            computeDeliveryProfile(System.currentTimeMillis()) == fastDeliveryProfile
-        // 特权通道读取栈顶组件远快于无障碍 root 节点获取,
-        // 优先使用可避免 safeActiveWindow 耗时导致事件堆积堵塞
-        // https://github.com/gkd-kit/gkd/issues/622
-        lastAppId = privilegeContextFlow.value?.run { topCpn()?.packageName }
-            ?: if (allowA11yFallback) {
-                withTimeoutOrNull(100.milliseconds) {
-                    runInterruptible(Dispatchers.IO) { safeActiveWindowAppId }
-                }
-            } else {
-                null
+    private suspend fun getTimeoutAppId(forceRefresh: Boolean = false): String? {
+        val privilegeContext = privilegeContextFlow.value
+        if (privilegeContext != null) {
+            // 特权通道读取栈顶组件远快于无障碍 root 节点获取, 且不会打开无障碍服务端缓存标志
+            // https://github.com/gkd-kit/gkd/issues/622
+            return privilegeContext.topCpn()?.packageName.also {
+                lastAppId = it
+                lastGetAppIdTime = System.currentTimeMillis()
             }
+        }
+        if (!forceRefresh && lastAppId != null && System.currentTimeMillis() - lastGetAppIdTime <= 100) {
+            return lastAppId
+        }
+        lastAppId = withTimeoutOrNull(100.milliseconds) {
+            runInterruptible(Dispatchers.IO) { safeActiveWindowAppId }
+        }
         lastGetAppIdTime = System.currentTimeMillis()
         return lastAppId
     }
@@ -255,6 +271,9 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
 
     @Volatile
     private var querying = false
+    private var pendingQuery = false
+    private var pendingForced = false
+    private val pendingDelayRules = LinkedHashSet<ResolvedRule>()
 
     @Synchronized
     private fun startQueryJob(
@@ -267,11 +286,21 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         // 这里不能触发 checkFutureStartJob, 否则会形成 300ms 空转自旋
         if (!gateOpen(System.currentTimeMillis())) return
         if (activityRuleFlow.value.currentRules.isEmpty()) return
-        if (querying) return
+        if (querying) {
+            if (byDelayRule != null) {
+                pendingDelayRules.add(byDelayRule)
+            } else if (byEvent == null) {
+                pendingQuery = true
+                if (byForced) {
+                    pendingForced = true
+                }
+            }
+            return
+        }
         // 无障碍从零启动时获取 safeActiveWindow 非常耗时
         if (byEvent == null && service.justStarted) return checkFutureStartJob()
+        querying = true
         scope.launchTry(queryDispatcher) {
-            querying = true
             val st = if (META.debuggable) System.currentTimeMillis() else 0L
             try {
                 if (META.debuggable) {
@@ -285,14 +314,40 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 // 查询会把服务端缓存标志重新置位, 标记后在回到空闲档时强制重关
                 cacheDirty = true
                 applyDeliveryProfile()
-                checkFutureStartJob()
                 if (META.debuggable) {
                     val et = System.currentTimeMillis() - st
                     Log.d("A11yRuleEngine", "startQueryJob end $et ms")
                 }
-                querying = false
+                onQueryJobFinished()
             }
         }
+    }
+
+    @Synchronized
+    private fun onQueryJobFinished() {
+        querying = false
+        val nextDelayRule = pendingDelayRules.firstOrNull()?.also {
+            pendingDelayRules.remove(it)
+        }
+        if (nextDelayRule != null) {
+            startQueryJob(byDelayRule = nextDelayRule)
+            return
+        }
+        val nextEvent = synchronized(queryEvents) { queryEvents.lastOrNull() }
+        if (nextEvent != null) {
+            pendingQuery = false
+            pendingForced = false
+            startQueryJob(byEvent = nextEvent)
+            return
+        }
+        if (pendingQuery) {
+            val forced = pendingForced
+            pendingQuery = false
+            pendingForced = false
+            startQueryJob(byForced = forced)
+            return
+        }
+        checkFutureStartJob()
     }
 
     private fun checkFutureStartJob() {
@@ -307,15 +362,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 delay(300.milliseconds)
                 startQueryJob(byForced = true)
             }
-        }
-    }
-
-    private fun prewarmActiveWindow() {
-        if (!storeFlow.value.enableMatch) return
-        val activityRule = activityRuleFlow.value
-        if (activityRule.skipMatch || activityRule.currentRules.isEmpty()) return
-        scope.launchTry(Dispatchers.IO) {
-            safeActiveWindow
         }
     }
 
@@ -346,11 +392,15 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         }
     }
 
+    private fun hasAliveRule(activityRule: ActivityRule): Boolean {
+        if (activityRule.blockMatch) return false
+        return !activityRule.skipConsumeEvent || activityRule.appRules.any { it.status.alive }
+    }
+
     private fun computeDeliveryProfile(t: Long): DeliveryProfile {
         if (!storeFlow.value.enableMatch) return idleDeliveryProfile()
-        val activityRule = activityRuleFlow.value
-        if (activityRule.currentRules.isEmpty() || activityRule.skipMatch) return idleDeliveryProfile()
-        return if (windowOrTailActive(t)) fastDeliveryProfile else idleDeliveryProfile()
+        if (!windowOrTailActive(t)) return idleDeliveryProfile()
+        return if (hasAliveRule(activityRuleFlow.value)) fastDeliveryProfile else idleDeliveryProfile()
     }
 
     private fun applyDeliveryProfile() {
@@ -406,8 +456,14 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         if (topActivityFlow.value.appId == rightAppId) return
         synchronized(topActivityFlow) {
             val topCpn = privilegeContextFlow.value?.topCpn()
-            if (topCpn?.packageName == rightAppId) {
-                updateTopActivity(topCpn.packageName, topCpn.className)
+            if (topCpn != null) {
+                if (!topActivityFlow.value.sameAs(topCpn)) {
+                    updateTopActivity(
+                        topCpn.packageName,
+                        topCpn.className,
+                        scene = ActivityScene.TaskStack,
+                    )
+                }
             } else {
                 updateTopActivity(rightAppId, null)
             }
@@ -484,10 +540,8 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         }
         var lastNodeUsed = false
         if (!a11yContext.clearOldAppNodeCache()) {
-            if (byEvent != null) { // 此为多数情况
-                // 新事件到来时, 若缓存清理不及时会导致无法查询到节点
-                a11yContext.clearNodeCache(lastNode)
-            }
+            // 新事件或轮询到来时, 若缓存清理不及时会导致无法查询到节点
+            a11yContext.clearNodeCache(lastNode)
         }
         for (rule in activityRule.priorityRules) { // 规则数量有可能过多导致耗时过长
             if (checkOutDate(activityRule, tempStateEvent)) break
@@ -513,6 +567,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             val rightAppId = nodeVal.packageName?.toString() ?: break
             val matchApp = rule.matchActivity(rightAppId)
             if (topActivityFlow.value.appId != rightAppId || (!matchApp && rule is AppRule)) {
+                a11yContext.clearNodeCache()
                 scope.launch(eventDispatcher) { fixAppId(rightAppId) }
                 return
             }

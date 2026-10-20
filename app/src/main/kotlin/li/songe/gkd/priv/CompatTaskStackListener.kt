@@ -20,9 +20,10 @@ object CompatTaskStackListener : ITaskStackListener.Stub() {
 
     override fun onTaskStackChanged(): Unit = synchronized(topActivityFlow) {
         val cpn = privilegeContextFlow.value?.topCpn() ?: return
-        if (lastFront.first > 0 && lastFront.second == cpn && System.currentTimeMillis() - lastFront.first > 200) {
+        if (lastFront.first > 0) {
+            val skip = lastFront.second == cpn && System.currentTimeMillis() - lastFront.first < 200
             lastFront = defaultFront
-            return
+            if (skip) return
         }
         updateTopActivity(
             appId = cpn.packageName,
