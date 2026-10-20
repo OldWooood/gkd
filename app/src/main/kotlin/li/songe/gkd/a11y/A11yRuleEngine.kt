@@ -39,6 +39,7 @@ private const val PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT = 0L
 private const val FALLBACK_IDLE_EVENT_DELIVERY_TIMEOUT = 500L
 private const val SPLASH_ACTIVE_WINDOW = 8_000L
 private const val POST_TRIGGER_WINDOW = 3_000L
+private const val CONTENT_EVENT_THROTTLE = 100L
 
 private data class DeliveryProfile(
     val eventTypes: Int,
@@ -99,7 +100,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             lastGetAppIdTime = 0L
             lastAppId = null
         }
-        a11yContext.interruptKey++
+        a11yContext.interruptMatching()
         scope.launch(actionDispatcher) {
             refreshDeliveryProfile()
             startQueryJob()
@@ -125,6 +126,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     @Volatile
     private var latestStateEvent: A11yEvent? = null
     private var lastContentEventTime = 0L
+    private var lastCrossAppContentEventTime = 0L
     private var lastEventTime = 0L
     private val eventDeque = ArrayDeque<A11yEvent>()
     fun onA11yEvent(event: AccessibilityEvent?) {
@@ -148,15 +150,24 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
 
         val a11yEvent = event.toA11yEvent() ?: return
         if (a11yEvent.type == CONTENT_CHANGED) {
-            // 防止同应用空闲期 content 类型事件过快; 跨应用事件可能触发切应用升档, 不节流
-            if (
-                a11yEvent.appId == topActivityFlow.value.appId &&
-                a11yEvent.time - lastContentEventTime < 100 &&
-                !windowOrTailActive(a11yEvent.time)
-            ) {
-                return
+            // 防止空闲期 content 事件过快。跨应用事件可能触发切应用升档, 使用独立时间戳,
+            // 避免被同应用事件节流, 同时限制后台应用 content 事件的总频率。
+            val fromTopApp = a11yEvent.appId == topActivityFlow.value.appId
+            if (!windowOrTailActive(a11yEvent.time)) {
+                val lastTime = if (fromTopApp) {
+                    lastContentEventTime
+                } else {
+                    lastCrossAppContentEventTime
+                }
+                if (a11yEvent.time - lastTime < CONTENT_EVENT_THROTTLE) {
+                    return
+                }
             }
-            lastContentEventTime = a11yEvent.time
+            if (fromTopApp) {
+                lastContentEventTime = a11yEvent.time
+            } else {
+                lastCrossAppContentEventTime = a11yEvent.time
+            }
         }
         if (META.debuggable) {
             Log.d(
@@ -202,11 +213,13 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         } else {
             getTimeoutAppId(forceRefresh = isActivityStateEvent) ?: return
         }
+        // 特权下 topCpn 是实时读取; 非特权下只有 activity state 事件会强制刷新 root
+        val rightAppIdConfirmed = isActivityStateEvent || privilegeContextFlow.value != null
         if (rightAppId == evAppId) {
             if (isActivityStateEvent) {
                 synchronized(topActivityFlow) {
                     // tv.danmaku.bili, com.miui.home, com.miui.home.launcher.Launcher
-                    updateTopActivity(evAppId, evActivityId)
+                    updateTopActivity(evAppId, evActivityId, confirmedTop = true)
                 }
             }
         }
@@ -221,7 +234,11 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                         scene = ActivityScene.TaskStack,
                     )
                 } else {
-                    updateTopActivity(rightAppId, null)
+                    updateTopActivity(
+                        rightAppId,
+                        null,
+                        confirmedTop = rightAppIdConfirmed,
+                    )
                 }
             }
         }
@@ -234,7 +251,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             return
         }
         synchronized(queryEvents) { queryEvents.addAll(consumedEvents) }
-        a11yContext.interruptKey++
+        a11yContext.interruptMatching()
         startQueryJob(byEvent = latestEvent)
     }
 
@@ -465,7 +482,8 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                     )
                 }
             } else {
-                updateTopActivity(rightAppId, null)
+                // 活动窗口/已刷新的节点包名可以直接作为栈顶依据
+                updateTopActivity(rightAppId, null, confirmedTop = true)
             }
         }
         scope.launch(actionDispatcher) {
@@ -539,8 +557,9 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             }
         }
         var lastNodeUsed = false
-        if (!a11yContext.clearOldAppNodeCache()) {
-            // 新事件或轮询到来时, 若缓存清理不及时会导致无法查询到节点
+        if (!a11yContext.clearOldAppNodeCache() && lastNode != null) {
+            // 事件节点存在时清理其子树, 避免新事件到来后仍命中旧节点;
+            // 轮询没有事件节点, 会通过 safeActiveWindow 获取新的 root, 无需整体清空缓存
             a11yContext.clearNodeCache(lastNode)
         }
         for (rule in activityRule.priorityRules) { // 规则数量有可能过多导致耗时过长

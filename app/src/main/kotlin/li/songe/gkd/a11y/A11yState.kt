@@ -20,7 +20,6 @@ import li.songe.gkd.data.ResolvedRule
 import li.songe.gkd.data.RuleStatus
 import li.songe.gkd.data.isSystem
 import li.songe.gkd.db.DbSet
-import li.songe.gkd.priv.privilegeContextFlow
 import li.songe.gkd.store.actionCountFlow
 import li.songe.gkd.store.checkAppBlockMatch
 import li.songe.gkd.util.LogUtils
@@ -133,11 +132,13 @@ sealed class ActivityScene {
 }
 
 // 外部必须使用 synchronized(topActivityFlow) 来保证更新的原子性
+// confirmedTop: 调用方已通过特权栈顶或活动窗口确认 appId 就是当前栈顶
 fun updateTopActivity(
     appId: String,
     activityId: String?,
     scene: ActivityScene = ActivityScene.A11y,
     loc: String = "",
+    confirmedTop: Boolean = false,
 ) {
     val t = System.currentTimeMillis()
     val oldActivity = topActivityFlow.value
@@ -148,13 +149,10 @@ fun updateTopActivity(
         if (isSame && t - lastActivityUpdateTime < 1000) return
         lastActivityForceUpdateTime = t
     } else if (scene == ActivityScene.A11y) {
-        if (idChanged && lastActivityForceUpdateTime > 0) {
-            // ITaskStackListener 大部分场景快于无障碍, 仅当栈顶已不是当前事件包名时拦截滞后的旧应用事件
-            val topPkg = privilegeContextFlow.value?.topCpn()?.packageName
-            if (topPkg != appId) {
-                if (t - lastActivityForceUpdateTime < 1000) return
-                if (activityId != null && t - lastActivityForceUpdateTime < 3000) return
-            }
+        if (!confirmedTop && idChanged && lastActivityForceUpdateTime > 0) {
+            // ITaskStackListener 大部分场景快于无障碍, 仅拦截未经确认的滞后 A11y 更新
+            if (t - lastActivityForceUpdateTime < 1000) return
+            if (activityId != null && t - lastActivityForceUpdateTime < 3000) return
         }
         if (isSame && t - lastActivityUpdateTime < 1000) return
     }

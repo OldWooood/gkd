@@ -1,8 +1,8 @@
 # 特权空闲零投递方案
 
 > 适用项目：gkd fork（只跳开屏广告）
-> 状态：待实现
-> 版本：v6
+> 状态：已实现（文档按当前代码行为维护）
+> 版本：v7
 > 事实依据：android-16.0.0_r1 源码
 
 ---
@@ -140,9 +140,9 @@
 
 | 档位 | 什么时候用 | 收什么事件 | 多快收到 | 节点缓存 |
 |---|---|---|---|---|
-| **FAST** | 窗口/尾巴内，且当前应用有可用规则 | state + content | 立即（0ms） | 开 |
-| **IDLE_PRIVILEGED** | 特权在线，窗口外（含匹配关闭/无规则） | **只有 state** | 立即（0ms） | 关 |
-| **IDLE_FALLBACK** | 没连 Shizuku | state + content | 最多等 500ms | 开 |
+| **FAST** | 窗口/尾巴内，且未屏蔽匹配、存在存活规则（当前 activity 或该应用任意规则） | state + content | 立即（0ms） | 开 |
+| **IDLE_PRIVILEGED** | 特权在线，且未进入 FAST（窗口外/无存活规则/匹配关闭） | **只有 state** | 立即（0ms） | 关 |
+| **IDLE_FALLBACK** | 没连 Shizuku，且未进入 FAST | state + content | 最多等 500ms | 开 |
 
 设计理由：
 
@@ -160,14 +160,25 @@ fun windowOrTailActive(t) = t - appChangeTime < 8秒 || t - lastTriggerTime < 3�
 // 门控：允许匹配查询吗（非特权永远允许，保持现状）
 fun gateOpen(t) = privilege == null || windowOrTailActive(t)
 
+// 当前 activity 有存活规则，或该应用有任意存活规则
+// alive 指未被最大次数/前置规则/匹配时限终止，包含匹配延迟、冷却、触发延迟中的规则
+fun hasAliveRule(activityRule) =
+    !activityRule.blockMatch &&
+    (!activityRule.skipConsumeEvent || activityRule.appRules.any { it.status.alive })
+
 // 选哪个档位
 fun computeProfile(t) = when {
     匹配已关闭            -> 特权在线 ? IDLE_PRIVILEGED : IDLE_FALLBACK   // 顺带优化
-    当前应用没有可用规则   -> 特权在线 ? IDLE_PRIVILEGED : IDLE_FALLBACK
-    windowOrTailActive(t) -> FAST
+    !windowOrTailActive(t) -> 特权在线 ? IDLE_PRIVILEGED : IDLE_FALLBACK
+    hasAliveRule(当前规则) -> FAST
     else                  -> 特权在线 ? IDLE_PRIVILEGED : IDLE_FALLBACK
 }
 ```
+
+补充说明：
+
+- `skipMatch`（当前所有规则都不是 `ok` 状态）不再单独降档。处于匹配延迟/冷却/触发延迟的规则仍算存活，窗口内继续保持 FAST，避免二次点击或延迟触发时已经降档。
+- `appRules` 是该应用的全部规则，不限于当前 activity；这是为了覆盖开屏 Activity 切换（例如启动页 → 广告页）时，当前 activity 还匹配不到规则、但应用已有存活规则的短暂阶段。
 
 ### 4.3 时间线示例
 
@@ -252,7 +263,31 @@ t0+几ms 档位应用完成（两次配置调用）→ FAST 生效
 
 ### 5.5 兜底取包名的一个例外
 
-有个函数在"事件里的应用和当前记录不一致"时会去读根节点拿包名。它跑在正常查询之外，不受门控保护——特权且非窗口时必须禁掉这条 a11y 兜底（否则会偷偷打开缓存标志）。特权下 app 切换本就由 TaskStack 负责，不依赖它。非特权不动。
+有个函数在"事件里的应用和当前记录不一致"时会去读根节点拿包名。它跑在正常查询之外，不受门控保护——因此只要特权在线，`getTimeoutAppId` 就只使用特权 `topCpn()`，**任何情况下都不回退到 a11y root**（包括窗口/尾巴内），否则会偷偷打开缓存标志。
+
+这与早期方案不同：早期只要求在非窗口期禁用兜底，窗口内允许 a11y 兜底；当前实现为了严格守住"查询之外不碰 root"，在特权下完全禁用了兜底。代价是 Shizuku 瞬时失败、`getTasks` 返回空列表时，`topCpn()` 为 `null`，跨应用事件会被 `consumeEvent` 直接丢弃，而不是退化为一次 root 读取。特权下 app 切换本就由 TaskStack 负责，因此接受这个损失。
+
+### 5.6 content 事件节流
+
+空闲期（不在窗口/尾巴内）的 content 事件按来源分成两路，各保留 100ms 最小间隔：
+
+| 来源 | 时间戳 | 目的 |
+|---|---|---|
+| 当前栈顶应用 | `lastContentEventTime` | 保持历史行为，避免同应用高频 content 事件 |
+| 其他应用 | `lastCrossAppContentEventTime` | 允许跨应用事件按独立间隔进入管线以修正 topActivity，同时限制后台应用 content 事件的总频率 |
+
+窗口/尾巴内不做节流，只更新时间戳。这样既不会出现"切应用后新应用的 content 事件被同应用时间戳误伤"，也不会让后台 content 事件无限进入管线。
+
+### 5.7 A11y 与 TaskStack 的优先级
+
+`updateTopActivity` 对 A11y 场景保留了"TaskStack 刚更新后 1 秒 / 3 秒内拦截未确认更新"的保护，但**不再在函数内部调用特权 `topCpn()`**：
+
+- 调用方如果已经通过**实时**特权栈顶或活动窗口确认了 `appId`，传入 `confirmedTop = true`，跳过该时间窗。当前确认路径包括 `consumeEvent` 中的 activity state 事件、特权在线时的 `getTimeoutAppId` 结果、`fixAppId` 的活动窗口结果，以及 `A11yService.onDestroyed` 的特权栈顶。
+- 非特权的 content 事件可能命中 100ms 的 `getTimeoutAppId` 缓存，不算确认，仍走时间窗保护。
+- 未确认的 A11y 更新（例如 `MainActivity.onStart`）继续使用旧的时间窗保护。
+- 这样既避免在 `updateTopActivity` 内部新增锁内/主线程 binder 调用，也保留了 TaskStack 相对 A11y 的优先级。
+
+同一应用内的 Activity 切换不进入该时间窗（只有 `appId` 变化才算 `idChanged`）。当前行为是：同应用内仍以 A11y state 事件为准，滞后的同应用事件可能覆盖 TaskStack 的 activity；这是已知边界，未做额外拦截。
 
 ---
 
@@ -323,22 +358,38 @@ fun 应用档位() = synchronized(锁) {
 | I6 | 特权掉线立即回 IDLE_FALLBACK | 否则掉线期收不到事件 |
 | I7 | 档位应用串行、幂等、失败不记账 | 防止错序与卡死 |
 
+### 7.3 查询请求的排队与优先级
+
+`startQueryJob` 同一时刻只允许一个查询在跑，查询进行中到达的请求不再直接丢弃，而是进入三个待处理通道：
+
+| 通道 | 来源 | 说明 |
+|---|---|---|
+| `pendingDelayRules` | 匹配延迟/触发延迟到期 | 按到期顺序排队，优先于事件查询 |
+| `queryEvents` | 新无障碍事件 | 查询结束后取队尾事件重新启动，`queryAction` 会一次性消费当前队列 |
+| `pendingQuery` / `pendingForced` | `onTopActivityChanged`、强制查询等 | 没有事件时补一次查询；`pendingForced` 记录是否需要 forced 语义 |
+
+查询结束后的处理顺序是：delay rule → `queryEvents` → pending query → `checkFutureStartJob()`。
+
+注意：如果存在待处理事件，会清空 `pendingForced` 并优先执行事件查询；event 查询不携带 forced 语义。通常 `checkFutureStartJob()` 会在下一轮根据 `hasFeatureAction` 重新调度 forced 查询，但在窗口/尾巴都已结束且没有 feature action 时，这次 forced 请求不会单独补发。当前接受这一行为。
+
 ---
 
 ## 8. 代码改动点
 
-只动 `a11y/A11yRuleEngine.kt` 一个文件：
+主要涉及 `a11y/A11yRuleEngine.kt`、`a11y/A11yState.kt`、`a11y/A11yContext.kt` 与 `service/A11yService.kt`：
 
 | 位置 | 改动 | 为什么 |
 |---|---|---|
-| 常量 | 新增 `POST_TRIGGER_WINDOW = 3s`、`PRIVILEGED_IDLE_TIMEOUT = 0`、三个档位定义 | 参数集中 |
-| 新增 | 档位数据类、哨兵、锁、`applyDeliveryProfile`、`windowOrTailActive`、`gateOpen` | 方案主体 |
+| 常量 | 新增 `POST_TRIGGER_WINDOW = 3s`、`PRIVILEGED_IDLE_EVENT_DELIVERY_TIMEOUT = 0`、`FALLBACK_IDLE_EVENT_DELIVERY_TIMEOUT = 500ms`、`CONTENT_EVENT_THROTTLE = 100ms`、三个档位定义 | 参数集中 |
+| 新增 | 档位数据类、哨兵、锁、`applyDeliveryProfile`、`windowOrTailActive`、`gateOpen`、`hasAliveRule` | 方案主体 |
 | `onTopActivityChanged` / `onScreenForcedActive` / `onA11yConnected` | 改为调用 `applyDeliveryProfile`（替换现有 `refreshEventDeliveryTimeout`） | 两个开窗点与连接点 |
-| `consumeEvent` | 门控判断前移到 `queryEvents.addAll` 之前 | 防止被挡下的事件积压 |
+| `consumeEvent` | 门控判断前移到 `queryEvents.addAll` 之前；查询进行中的事件/延迟规则排队而不是丢弃 | 防止被挡下的事件积压、避免请求丢失 |
 | `startQueryJob` | 顶部加 `gateOpen` 早退；早退不调 `checkFutureStartJob` | 防 300ms 空转自旋 |
-| `startQueryJob` finally | `缓存脏了 = true` + `applyDeliveryProfile` | 保证缓存能重关 |
-| `queryAction` | 入口 `applyDeliveryProfile` | 首个节点访问前缓存已开 |
-| `getTimeoutAppId` | 特权且非窗口时禁用 a11y 兜底 | 防止偷开缓存（§5.5） |
+| `startQueryJob` finally | `缓存脏了 = true` + `applyDeliveryProfile`，再进入 `onQueryJobFinished` 处理待处理请求 | 保证缓存能重关，并串行补发排队请求 |
+| `queryAction` | 入口 `applyDeliveryProfile`；仅在存在事件节点时清理节点缓存（节点不在缓存树中时会全清），轮询依赖新的 root | 首个节点访问前缓存已开；避免轮询反复清空全部缓存 |
+| `getTimeoutAppId` | 特权在线时只读 `topCpn()`，任何情况下都不回退 a11y root | 防止查询之外偷开缓存（§5.5） |
+| `updateTopActivity` | 增加 `confirmedTop` 参数；不再在函数内调用 `topCpn()` | 避免锁内/主线程 binder，同时保留 TaskStack 优先级（§5.7） |
+| `A11yContext.interruptKey` | 改用 atomicfu 原子自增 | 事件线程与 TaskStack/主线程都会触发中断，普通 `++` 会丢更新 |
 | 降档定时（原 restore job） | 关窗时刻 = `max(appChangeTime + 8s, lastTriggerTime + 3s)`；到期重算档位 | 尾巴参与关窗 |
 | `onA11yConnected` | 挂两个监听：特权连接状态、匹配开关 → 立即重算档位（跑在 actionDispatcher） | 掉线/开关立即生效 |
 
@@ -353,7 +404,9 @@ fun 应用档位() = synchronized(锁) {
 | **特权空闲期的应用内广告** | 二级页、Dialog、WebView 内嵌一律不匹配——只跳开屏的范围内接受（§3） |
 | 冷启动极慢、8 秒后才渲染出广告 | 窗口已关 → 跳过不了（慢设备/重应用的极端情况） |
 | 开窗到档位生效之间的 content | 直接丢，实际≈0（§5.4） |
-| 非特权用户 | 行为与今天完全一致：无收益也无损失 |
+| 特权下 Shizuku 瞬时失败 | `topCpn()` 为 null 时跨应用事件直接丢弃，不再回退 a11y root（§5.5） |
+| 同应用内 Activity 切换的滞后 A11y 事件 | `idChanged=false` 不进入 TaskStack 强制时间窗，可能覆盖较新的 TaskStack activity（§5.7） |
+| 非特权用户 | 与旧行为基本一致；空闲期 content 事件改为同应用/跨应用分别 100ms 节流，窗口/尾巴内不节流（§5.6） |
 
 ---
 
@@ -391,7 +444,7 @@ fun 应用档位() = synchronized(锁) {
 3. `applyDeliveryProfile`（含缓存脏标记、失败不记账）。
 4. 接线：三个入口改调 `applyDeliveryProfile`；降档定时改为关窗时刻。
 5. 门控三处：`consumeEvent` 前置判断、`startQueryJob` 早退（不触发自旋）、`queryAction` 入口保底。
-6. `getTimeoutAppId` 兜底禁用。
+6. `getTimeoutAppId` 特权下完全禁用 a11y 兜底。
 7. 查询结束打脏。
 8. 监听器（特权连接状态 + 匹配开关）。
 9. 按 §10 手工自检。

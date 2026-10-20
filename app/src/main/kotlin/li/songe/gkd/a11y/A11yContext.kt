@@ -114,13 +114,18 @@ class A11yContext(
 
     var currentRule: ResolvedRule? = null
 
-    @Volatile
-    var interruptKey = 0
+    private val interruptKey = atomic(0)
     private var interruptInnerKey = 0
 
+    // 事件线程与 TaskStack/主线程都会调用, 必须原子自增
+    fun interruptMatching() {
+        interruptKey.incrementAndGet()
+    }
+
     private fun guardInterrupt() {
-        if (interruptInnerKey == interruptKey) return
-        interruptInnerKey = interruptKey
+        val key = interruptKey.value
+        if (interruptInnerKey == key) return
+        interruptInnerKey = key
         val rule = currentRule ?: return
         if (!activityRuleFlow.value.activePriority) return
         if (!activityRuleFlow.value.currentRules.any { it === rule }) return

@@ -86,7 +86,11 @@ abstract class A11yService : AccessibilityService(), OnA11yLife by DefaultA11yLi
                     topCpn()?.let { cpn ->
                         // com.android.systemui
                         if (!topActivityFlow.value.sameAs(cpn.packageName, cpn.className)) {
-                            updateTopActivity(cpn.packageName, cpn.className)
+                            updateTopActivity(
+                                cpn.packageName,
+                                cpn.className,
+                                confirmedTop = true,
+                            )
                         }
                     }
                 }
