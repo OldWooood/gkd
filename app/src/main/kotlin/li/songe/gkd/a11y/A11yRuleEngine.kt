@@ -273,17 +273,32 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         if (!forceRefresh && lastAppId != null && System.currentTimeMillis() - lastGetAppIdTime <= 100) {
             return lastAppId
         }
+        val st = if (META.debuggable) System.currentTimeMillis() else 0L
         lastAppId = withTimeoutOrNull(100.milliseconds) {
             runInterruptible(Dispatchers.IO) { safeActiveWindowAppId }
         }
         lastGetAppIdTime = System.currentTimeMillis()
+        if (META.debuggable) {
+            Log.d(
+                "A11yRuleEngine",
+                "getTimeoutAppId cost=${System.currentTimeMillis() - st}ms, result=${lastAppId != null}"
+            )
+        }
         return lastAppId
     }
 
     private suspend fun getTimeoutActiveWindow(): AccessibilityNodeInfo? {
-        return withTimeoutOrNull(500.milliseconds) {
+        val st = if (META.debuggable) System.currentTimeMillis() else 0L
+        val node = withTimeoutOrNull(500.milliseconds) {
             runInterruptible(Dispatchers.IO) { safeActiveWindow }
         }
+        if (META.debuggable) {
+            Log.d(
+                "A11yRuleEngine",
+                "getTimeoutActiveWindow cost=${System.currentTimeMillis() - st}ms, result=${node != null}"
+            )
+        }
+        return node
     }
 
     @Volatile
@@ -314,8 +329,6 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             }
             return
         }
-        // 无障碍从零启动时获取 safeActiveWindow 非常耗时
-        if (byEvent == null && service.justStarted) return checkFutureStartJob()
         querying = true
         scope.launchTry(queryDispatcher) {
             val st = if (META.debuggable) System.currentTimeMillis() else 0L
@@ -562,6 +575,16 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             // 轮询没有事件节点, 会通过 safeActiveWindow 获取新的 root, 无需整体清空缓存
             a11yContext.clearNodeCache(lastNode)
         }
+        // 同一次查询内复用回退 root: 事件没有 source 时, 多个规则不应重复等待 safeActiveWindow
+        var fallbackNode: AccessibilityNodeInfo? = null
+        var fallbackNodeFetched = false
+        suspend fun getFallbackNode(): AccessibilityNodeInfo? {
+            if (!fallbackNodeFetched) {
+                fallbackNodeFetched = true
+                fallbackNode = getTimeoutActiveWindow()
+            }
+            return fallbackNode
+        }
         for (rule in activityRule.priorityRules) { // 规则数量有可能过多导致耗时过长
             if (checkOutDate(activityRule, tempStateEvent)) break
             if (delayRule != null && delayRule !== rule) continue
@@ -582,7 +605,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                     lastNode = null
                 }
             }
-            val nodeVal = (lastNode ?: getTimeoutActiveWindow()) ?: continue
+            val nodeVal = (lastNode ?: getFallbackNode()) ?: continue
             val rightAppId = nodeVal.packageName?.toString() ?: break
             val matchApp = rule.matchActivity(rightAppId)
             if (topActivityFlow.value.appId != rightAppId || (!matchApp && rule is AppRule)) {

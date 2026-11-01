@@ -49,15 +49,6 @@ abstract class A11yService : AccessibilityService(), OnA11yLife by DefaultA11yLi
     override fun onDestroy() = onDestroyed()
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = ruleEngine.onA11yEvent(event)
 
-    val startTime = System.currentTimeMillis()
-    override var justStarted: Boolean = true
-        get() {
-            if (field) {
-                field = System.currentTimeMillis() - startTime < 3_000
-            }
-            return field
-        }
-
     override fun shutdown() {
         disableSelf()
     }

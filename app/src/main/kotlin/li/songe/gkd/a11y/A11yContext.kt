@@ -138,7 +138,15 @@ class A11yContext(
 
     private fun getA11Root(): AccessibilityNodeInfo? {
         guardInterrupt()
-        return a11yEngine.safeActiveWindow
+        val st = if (META.debuggable) System.currentTimeMillis() else 0L
+        val node = a11yEngine.safeActiveWindow
+        if (META.debuggable) {
+            Log.d(
+                "A11yContext",
+                "getA11Root cost=${System.currentTimeMillis() - st}ms, result=${node != null}"
+            )
+        }
+        return node
     }
 
     private fun getA11Child(node: AccessibilityNodeInfo, index: Int): AccessibilityNodeInfo? {

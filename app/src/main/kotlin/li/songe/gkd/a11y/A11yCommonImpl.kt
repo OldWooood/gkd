@@ -6,7 +6,6 @@ import kotlinx.coroutines.CoroutineScope
 interface A11yCommonImpl {
     val windowNodeInfo: AccessibilityNodeInfo?
     val scope: CoroutineScope
-    var justStarted: Boolean
     val ruleEngine: A11yRuleEngine
     fun shutdown()
 }
